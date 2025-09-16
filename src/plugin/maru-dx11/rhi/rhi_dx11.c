@@ -7,6 +7,8 @@
 #define COBJMACROS
 #include <d3d11.h>
 #include <dxgi.h>
+#include <d3dcommon.h>
+#include <d3dcompiler.h>
 
 typedef struct dx11_state {
     HWND hwnd;
@@ -26,20 +28,38 @@ struct rhi_swapchain {
     dx11_state_t *st;
 };
 
-struct rhi_buffer {
+typedef struct {
+    ID3D11Buffer *buf;
+    UINT stride;
+    UINT offset;
     size_t size;
+} dx11_buf;
+
+struct rhi_buffer {
+    dx11_buf vb;
 };
 
 struct rhi_texture {
     int w, h;
 };
 
+typedef struct {
+    ID3D11VertexShader *vs;
+    ID3D11PixelShader *ps;
+    ID3DBlob *vs_blob; /* for input layout */
+} dx11_shader;
+
 struct rhi_shader {
-    int linked;
+    dx11_shader sh;
 };
 
-struct rhi_pipeline {
+typedef struct {
     rhi_shader_t *sh;
+    ID3D11InputLayout *il;
+} dx11_pipeline;
+
+struct rhi_pipeline {
+    dx11_pipeline p;
 };
 
 struct rhi_cmd {
@@ -170,14 +190,34 @@ static void dx11_present(rhi_swapchain_t *s) {
 }
 
 static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t *desc, const void *initial) {
-    UNUSED(d);
-    UNUSED(desc);
-    UNUSED(initial);
-    return (rhi_buffer_t*)calloc(1, sizeof(rhi_buffer_t));
+    if (!d || !d->st || !desc || desc->size == 0) return NULL;
+
+    D3D11_BUFFER_DESC bd = {0};
+    bd.ByteWidth = (UINT)desc->size;
+    bd.Usage = D3D11_USAGE_DEFAULT;
+    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER; /* 데모: VB로 사용 */
+
+    D3D11_SUBRESOURCE_DATA srd = {0};
+    srd.pSysMem = initial;
+
+    ID3D11Buffer *buf = NULL;
+    HRESULT hr = ID3D11Device_CreateBuffer(d->st->dev, &bd, initial ? &srd : NULL, &buf);
+    if (FAILED(hr)) return NULL;
+
+    rhi_buffer_t *b = (rhi_buffer_t*)calloc(1, sizeof(rhi_buffer_t));
+    b->vb.buf = buf;
+    b->vb.size = desc->size;
+    return b;
 }
 
 static void dx11_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
     UNUSED(d);
+
+    if (!b) return;
+
+    if (b->vb.buf) {
+        ID3D11Buffer_Release(b->vb.buf);
+    }
     free(b);
 }
 
@@ -194,25 +234,99 @@ static void dx11_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
 }
 
 static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
-    UNUSED(d);
-    UNUSED(sd);
-    return (rhi_shader_t*)calloc(1, sizeof(rhi_shader_t));
+    if (!d || !sd || !sd->entry_vs || !sd->entry_ps) return NULL;
+
+    ID3DBlob *vsb = NULL, *psb = NULL, *err = NULL;
+    HRESULT hr = D3DCompile(sd->blob_vs, sd->blob_vs_size, "vs",
+                            NULL, NULL, sd->entry_vs, "vs_5_0", 0, 0, &vsb, &err);
+    if (FAILED(hr)) {
+        if (err)
+            ID3D10Blob_Release(err);
+        return NULL;
+    }
+    hr = D3DCompile(sd->blob_ps, sd->blob_ps_size, "ps",
+                    NULL, NULL, sd->entry_ps, "ps_5_0", 0, 0, &psb, &err);
+    if (FAILED(hr)) {
+        ID3D10Blob_Release(vsb);
+        if (err)
+            ID3D10Blob_Release(err);
+        return NULL;
+    }
+
+    ID3D11VertexShader *vs = NULL;
+    ID3D11PixelShader *ps = NULL;
+    hr = ID3D11Device_CreateVertexShader(d->st->dev, ID3D10Blob_GetBufferPointer(vsb),
+                                         (SIZE_T)ID3D10Blob_GetBufferSize(vsb), NULL, &vs);
+    if (FAILED(hr)) {
+        ID3D10Blob_Release(vsb);
+        ID3D10Blob_Release(psb);
+        return NULL;
+    }
+    hr = ID3D11Device_CreatePixelShader(d->st->dev, ID3D10Blob_GetBufferPointer(psb),
+                                        (SIZE_T)ID3D10Blob_GetBufferSize(psb), NULL, &ps);
+    if (FAILED(hr)) {
+        ID3D11VertexShader_Release(vs);
+        ID3D10Blob_Release(vsb);
+        ID3D10Blob_Release(psb);
+        return NULL;
+    }
+
+    rhi_shader_t *sh = (rhi_shader_t*)calloc(1, sizeof(rhi_shader_t));
+    sh->sh.vs = vs;
+    sh->sh.ps = ps;
+    sh->sh.vs_blob = vsb;
+
+    ID3D10Blob_Release(psb);
+    return sh;
 }
 
 static void dx11_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
     UNUSED(d);
+
+    if (!s) return;
+    if (s->sh.vs) {
+        ID3D11VertexShader_Release(s->sh.vs);
+    }
+
+    if (s->sh.ps) {
+        ID3D11PixelShader_Release(s->sh.ps);
+    }
+
+    if (s->sh.vs_blob) {
+        ID3D10Blob_Release(s->sh.vs_blob);
+    }
     free(s);
 }
 
 static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
-    UNUSED(d);
+    if (!d || !pd || !pd->shader) return NULL;
     rhi_pipeline_t *p = (rhi_pipeline_t*)calloc(1, sizeof(rhi_pipeline_t));
-    p->sh = pd->shader;
+    p->p.sh = pd->shader;
+
+    D3D11_INPUT_ELEMENT_DESC il[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, (UINT)(sizeof(float) * 3), D3D11_INPUT_PER_VERTEX_DATA, 0},
+    };
+
+    HRESULT hr = ID3D11Device_CreateInputLayout(d->st->dev, il, 2,
+                                                ID3D10Blob_GetBufferPointer(p->p.sh->sh.vs_blob),
+                                                (SIZE_T)ID3D10Blob_GetBufferSize(p->p.sh->sh.vs_blob),
+                                                &p->p.il);
+    if (FAILED(hr)) {
+        free(p);
+        return NULL;
+    }
     return p;
 }
 
 static void dx11_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p) {
     UNUSED(d);
+
+    if (!p) return;
+    if (p->p.il) {
+        ID3D11InputLayout_Release(p->p.il);
+    }
+
     free(p);
 }
 
@@ -228,17 +342,22 @@ static void dx11_end_cmd(rhi_cmd_t *c) {
 }
 
 static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_texture_t *color, rhi_texture_t *depth, const float clear[4]) {
-    UNUSED(c);
     UNUSED(color);
     UNUSED(depth);
 
-    // TODO:
-    dx11_state_t *st = c->st;
-
-    ID3D11DeviceContext_OMSetRenderTargets(st->ctx, 1, &st->rtv, NULL);
+    ID3D11DeviceContext_OMSetRenderTargets(c->st->ctx, 1, &c->st->rtv, NULL);
     if (clear) {
-        ID3D11DeviceContext_ClearRenderTargetView(st->ctx, st->rtv, clear);
+        ID3D11DeviceContext_ClearRenderTargetView(c->st->ctx, c->st->rtv, clear);
     }
+
+    D3D11_VIEWPORT vp = {0};
+    vp.TopLeftX = 0;
+    vp.TopLeftY = 0;
+    vp.Width = (FLOAT)c->st->w;
+    vp.Height = (FLOAT)c->st->h;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    ID3D11DeviceContext_RSSetViewports(c->st->ctx, 1, &vp);
 }
 
 static void dx11_cmd_end_render(rhi_cmd_t *c) {
@@ -246,8 +365,10 @@ static void dx11_cmd_end_render(rhi_cmd_t *c) {
 }
 
 static void dx11_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {
-    UNUSED(c);
-    UNUSED(p);
+    ID3D11DeviceContext_IASetInputLayout(c->st->ctx, p->p.il);
+    ID3D11DeviceContext_VSSetShader(c->st->ctx, p->p.sh->sh.vs, NULL, 0);
+    ID3D11DeviceContext_PSSetShader(c->st->ctx, p->p.sh->sh.ps, NULL, 0);
+    ID3D11DeviceContext_IASetPrimitiveTopology(c->st->ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
 static void dx11_cmd_bind_set(rhi_cmd_t *c, const rhi_binding_t *binds, int num, uint32_t stages) {
@@ -272,9 +393,10 @@ static void dx11_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int
 }
 
 static void dx11_cmd_set_vertex_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b) {
-    UNUSED(c);
-    UNUSED(slot);
-    UNUSED(b);
+    b->vb.stride = sizeof(float) * 6;
+    b->vb.offset = 0;
+    ID3D11Buffer *buf = b->vb.buf;
+    ID3D11DeviceContext_IASetVertexBuffers(c->st->ctx, (UINT)slot, 1, &buf, &b->vb.stride, &b->vb.offset);
 }
 
 static void dx11_cmd_set_index_buffer(rhi_cmd_t *c, rhi_buffer_t *b) {
@@ -283,10 +405,8 @@ static void dx11_cmd_set_index_buffer(rhi_cmd_t *c, rhi_buffer_t *b) {
 }
 
 static void dx11_cmd_draw(rhi_cmd_t *c, uint32_t vtx_count, uint32_t first, uint32_t inst) {
-    UNUSED(c);
-    UNUSED(vtx_count);
-    UNUSED(first);
     UNUSED(inst);
+    ID3D11DeviceContext_Draw(c->st->ctx, (UINT)vtx_count, (UINT)first);
 }
 
 static void dx11_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t first, uint32_t base_vtx, uint32_t inst) {
