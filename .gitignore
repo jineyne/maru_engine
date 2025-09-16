@@ -1,0 +1,7 @@
+.bootstrap_cache
+.vs
+.out
+binary
+compact
+out
+manifest.lock
