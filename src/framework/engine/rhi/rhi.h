@@ -7,6 +7,28 @@
 extern "C" {
 #endif
 
+typedef enum rhi_axis {
+    RHI_AXIS_UP = 0,
+    RHI_AXIS_DOWN = 1,
+} rhi_axis;
+
+typedef enum rhi_matrix_order {
+    RHI_MATRIX_COLUMN_MAJOR = 0,
+    RHI_MATRIX_ROW_MAJOR = 1,
+} rhi_matrix_order;
+
+typedef struct rhi_conventions {
+    rhi_axis uv_yaxis;
+    rhi_axis ndc_yaxis;
+    rhi_matrix_order matrix_order;
+} rhi_conventions_t;
+
+typedef struct rhi_capabilities {
+    float min_depth;
+    float max_depth;
+    rhi_conventions_t conventions;
+} rhi_capabilities_t;
+
 typedef struct rhi_device rhi_device_t;
 typedef struct rhi_swapchain rhi_swapchain_t;
 typedef struct rhi_buffer rhi_buffer_t;
@@ -113,6 +135,9 @@ typedef struct rhi_dispatch {
     rhi_fence_t * (*fence_create)(rhi_device_t *);
     void (*fence_wait)(rhi_fence_t *);
     void (*fence_destroy)(rhi_fence_t *);
+
+    /* caps */
+    void (*get_capabilities)(rhi_device_t *, rhi_capabilities_t *out_caps);
 } rhi_dispatch_t;
 
 typedef const rhi_dispatch_t * (*maru_rhi_entry_fn)(void);

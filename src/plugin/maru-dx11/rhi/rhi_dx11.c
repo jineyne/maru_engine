@@ -4,12 +4,26 @@
 
 #include "export.h"
 
+#define COBJMACROS
+#include <d3d11.h>
+#include <dxgi.h>
+
+typedef struct dx11_state {
+    HWND hwnd;
+    int w, h, vsync;
+
+    IDXGISwapChain *sc;
+    ID3D11Device *dev;
+    ID3D11DeviceContext *ctx;
+    ID3D11RenderTargetView *rtv;
+} dx11_state_t;
+
 struct rhi_device {
-    int dummy;
+    dx11_state_t *st;
 };
 
 struct rhi_swapchain {
-    int dummy;
+    dx11_state_t *st;
 };
 
 struct rhi_buffer {
@@ -29,30 +43,130 @@ struct rhi_pipeline {
 };
 
 struct rhi_cmd {
-    int dummy;
+    dx11_state_t *st;
 };
 
 struct rhi_fence {
     int dummy;
 };
 
-static rhi_device_t *dx11_create_device(const rhi_device_desc_t *d) {
-    INFO("creating Direct3D 11 device");
-    UNUSED(d);
-    return (rhi_device_t*)calloc(1, sizeof(rhi_device_t));
+#pragma region helpers
+
+static void dx11_release_all(dx11_state_t *st) {
+    if (!st) return;
+    if (st->rtv) {
+        ID3D11RenderTargetView_Release(st->rtv);
+        st->rtv = NULL;
+    }
+    if (st->ctx) {
+        ID3D11DeviceContext_Release(st->ctx);
+        st->ctx = NULL;
+    }
+    if (st->dev) {
+        ID3D11Device_Release(st->dev);
+        st->dev = NULL;
+    }
+    if (st->sc) {
+        IDXGISwapChain_Release(st->sc);
+        st->sc = NULL;
+    }
+}
+
+static int dx11_create_backbuffer_rtv(dx11_state_t *st) {
+    ID3D11Texture2D *backbuf = NULL;
+    HRESULT hr = IDXGISwapChain_GetBuffer(st->sc, 0, &IID_ID3D11Texture2D, (void**)&backbuf);
+    if (FAILED(hr)) return -1;
+
+    hr = ID3D11Device_CreateRenderTargetView(st->dev, (ID3D11Resource*)backbuf, NULL, &st->rtv);
+    ID3D11Texture2D_Release(backbuf);
+    return FAILED(hr) ? -1 : 0;
+}
+
+#pragma endregion helpers
+
+static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
+    if (!desc || !desc->native_window) return NULL;
+
+    dx11_state_t *st = (dx11_state_t*)calloc(1, sizeof(dx11_state_t));
+    if (!st) return NULL;
+
+    st->hwnd = (HWND)desc->native_window;
+    st->w = (desc->width > 0) ? desc->width : 1280;
+    st->h = (desc->height > 0) ? desc->height : 720;
+    st->vsync = desc->vsync ? 1 : 0;
+
+    DXGI_SWAP_CHAIN_DESC sd;
+    memset(&sd, 0, sizeof(sd));
+    sd.BufferDesc.Width = st->w;
+    sd.BufferDesc.Height = st->h;
+    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    sd.SampleDesc.Count = 1;
+    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    sd.BufferCount = 2;
+    sd.OutputWindow = st->hwnd;
+    sd.Windowed = TRUE;
+    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+    const D3D_FEATURE_LEVEL fls[] = {
+        D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
+    };
+    D3D_FEATURE_LEVEL got = 0;
+
+    UINT flags = 0;
+#if !defined(NDEBUG)
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    HRESULT hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, flags,
+                                               fls, (UINT)(sizeof(fls) / sizeof(fls[0])),
+                                               D3D11_SDK_VERSION,
+                                               &sd, &st->sc, &st->dev, &got, &st->ctx
+    );
+    if (FAILED(hr)) {
+        dx11_release_all(st);
+        free(st);
+        return NULL;
+    }
+
+    if (dx11_create_backbuffer_rtv(st) != 0) {
+        dx11_release_all(st);
+        free(st);
+        return NULL;
+    }
+
+    rhi_device_t *dev = (rhi_device_t*)calloc(1, sizeof(rhi_device_t));
+    if (!dev) {
+        dx11_release_all(st);
+        free(st);
+        return NULL;
+    }
+    dev->st = st;
+
+    return dev;
 }
 
 static void dx11_destroy_device(rhi_device_t *d) {
+    if (!d) return;
+
+    dx11_state_t *st = d->st;
+    dx11_release_all(st);
+    free(st);
+
     free(d);
 }
 
-static rhi_swapchain_t *dx11_get_swapchain(rhi_device_t *d) {
-    UNUSED(d);
-    return (rhi_swapchain_t*)calloc(1, sizeof(rhi_swapchain_t));
+static rhi_swapchain_t *dx11_get_swapchain(rhi_device_t *desc) {
+    if (!desc || !desc->st) return NULL;
+    rhi_swapchain_t *s = (rhi_swapchain_t*)calloc(1, sizeof(rhi_swapchain_t));
+    if (!s) return NULL;
+    s->st = desc->st;
+    return s;
 }
 
 static void dx11_present(rhi_swapchain_t *s) {
-    UNUSED(s); /* IDXGISwapChain::Present() */
+    if (!s || !s->st || !s->st->sc) return;
+    IDXGISwapChain_Present(s->st->sc, s->st->vsync ? 1 : 0, 0);
 }
 
 static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t *desc, const void *initial) {
@@ -103,20 +217,33 @@ static void dx11_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p) {
 }
 
 static rhi_cmd_t *dx11_begin_cmd(rhi_device_t *d) {
-    UNUSED(d);
-    return (rhi_cmd_t*)calloc(1, sizeof(rhi_cmd_t));
+    rhi_cmd_t *c = (rhi_cmd_t*)calloc(1, sizeof(rhi_cmd_t));
+    if (!c) return NULL;
+    c->st = d->st;
+    return c;
 }
 
-static void dx11_end_cmd(rhi_cmd_t *c) { free(c); }
+static void dx11_end_cmd(rhi_cmd_t *c) {
+    free(c);
+}
 
 static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_texture_t *color, rhi_texture_t *depth, const float clear[4]) {
     UNUSED(c);
     UNUSED(color);
     UNUSED(depth);
-    UNUSED(clear);
+
+    // TODO:
+    dx11_state_t *st = c->st;
+
+    ID3D11DeviceContext_OMSetRenderTargets(st->ctx, 1, &st->rtv, NULL);
+    if (clear) {
+        ID3D11DeviceContext_ClearRenderTargetView(st->ctx, st->rtv, clear);
+    }
 }
 
-static void dx11_cmd_end_render(rhi_cmd_t *c) { UNUSED(c); }
+static void dx11_cmd_end_render(rhi_cmd_t *c) {
+    UNUSED(c);
+}
 
 static void dx11_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {
     UNUSED(c);
@@ -132,10 +259,16 @@ static void dx11_cmd_bind_set(rhi_cmd_t *c, const rhi_binding_t *binds, int num,
 
 static void dx11_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int h) {
     UNUSED(c);
-    UNUSED(x);
-    UNUSED(y);
-    UNUSED(w);
-    UNUSED(h);
+
+    dx11_state_t *st = c->st;
+    D3D11_VIEWPORT vp;
+    vp.TopLeftX = (FLOAT)x;
+    vp.TopLeftY = (FLOAT)y;
+    vp.Width = (FLOAT)w;
+    vp.Height = (FLOAT)h;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    ID3D11DeviceContext_RSSetViewports(st->ctx, 1, &vp);
 }
 
 static void dx11_cmd_set_vertex_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b) {
@@ -169,8 +302,22 @@ static rhi_fence_t *dx11_fence_create(rhi_device_t *d) {
     return (rhi_fence_t*)calloc(1, sizeof(rhi_fence_t));
 }
 
-static void dx11_fence_wait(rhi_fence_t *f) { UNUSED(f); }
-static void dx11_fence_destroy(rhi_fence_t *f) { free(f); }
+static void dx11_fence_wait(rhi_fence_t *f) {
+    UNUSED(f);
+}
+
+static void dx11_fence_destroy(rhi_fence_t *f) {
+    free(f);
+}
+
+static void dx11_get_capabilities(rhi_device_t *dev, rhi_capabilities_t *out) {
+    (void)dev;
+    out->min_depth = 0.0f;
+    out->max_depth = 1.0f;
+    out->conventions.uv_yaxis = RHI_AXIS_DOWN;
+    out->conventions.ndc_yaxis = RHI_AXIS_UP;
+    out->conventions.matrix_order = RHI_MATRIX_ROW_MAJOR;
+}
 
 PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
     static const rhi_dispatch_t vtbl = {
@@ -190,6 +337,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         dx11_cmd_draw, dx11_cmd_draw_indexed,
         /* sync */
         dx11_fence_create, dx11_fence_wait, dx11_fence_destroy,
+        dx11_get_capabilities,
     };
     return &vtbl;
 }
