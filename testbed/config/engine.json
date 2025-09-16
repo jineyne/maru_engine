@@ -1,0 +1,9 @@
+{
+  "includes": ["graphics.json", "audio.json"],
+  "graphics": {
+    "backend": "gl"
+  },
+  "audio": {
+    "backend": "al"
+  }
+}
