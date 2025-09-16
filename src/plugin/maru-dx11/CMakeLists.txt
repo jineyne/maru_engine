@@ -10,7 +10,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE maru)
+target_link_libraries(${PROJECT_NAME} PRIVATE maru d3d11 dxgi uuid)
 
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${MARU_INSTALL_BIN_DIR}

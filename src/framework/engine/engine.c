@@ -42,6 +42,8 @@ int maru_engine_init(const char *config_path) {
     engine_context_init(&g_ctx);
 
     engine_context_load_rhi(&g_ctx, "maru-gl", "gl");
+
+    // only for android
     // engine_context_load_rhi(&g_ctx, "maru-gles", "gles");
 #if defined(_WIN32)
     engine_context_load_rhi(&g_ctx, "maru-dx11", "dx11");

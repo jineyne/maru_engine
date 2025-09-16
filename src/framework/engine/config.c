@@ -13,7 +13,7 @@ int config_load(const char *engine_json, maru_config_t *out) {
     free(buf);
     if (!root) return MARU_ERR_PARSE;
 
-    out->graphics_backend = json_get_string(root, "graphics.backend", "dx11");
+    out->graphics_backend = json_get_string(root, "graphics.backend", "gles");
     out->audio_backend = json_get_string(root, "audio.backend", "al");
     out->plugin_paths = json_get_string(root, "plugin_paths", NULL);
 

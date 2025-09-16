@@ -85,7 +85,7 @@ static void gl_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
     free(s);
 }
 
-static rhi_pipeline_t *gl_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t*pd) {
+static rhi_pipeline_t *gl_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     UNUSED(d);
     rhi_pipeline_t *p = (rhi_pipeline_t*)calloc(1, sizeof(rhi_pipeline_t));
     p->sh = pd->shader;
@@ -167,7 +167,7 @@ static rhi_fence_t *gl_fence_create(rhi_device_t *d) {
 static void gl_fence_wait(rhi_fence_t *f) { (void)f; }
 static void gl_fence_destroy(rhi_fence_t *f) { free(f); }
 
-PLUGIN_API const rhi_dispatch_t* maru_rhi_entry(void) {
+PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
     static const rhi_dispatch_t vtbl = {
         /* device */
         gl_create_device, gl_destroy_device,
