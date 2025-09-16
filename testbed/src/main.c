@@ -5,7 +5,7 @@ int main(void) {
         return 1;
     }
 
-    INFO("hello from testbed");
+    while (maru_engine_tick()) {}
 
     maru_engine_shutdown();
 

@@ -7,6 +7,8 @@
 
 #include <string.h>
 
+#include "platform/window.h"
+
 
 static engine_context_t g_ctx;
 
@@ -50,12 +52,21 @@ int maru_engine_init(const char *config_path) {
 #endif
 
     const char *want = map_backend_to_regname(cfg.graphics_backend);
+
+    int win_w = 1024, win_h = 768, win_vsync = 1;
+    g_ctx.window = platform_window_create(/*native_handle=*/NULL, win_w, win_h, win_vsync);
+    if (!g_ctx.window) {
+        ERROR("Failed to create platform window");
+        engine_context_shutdown(&g_ctx);
+        return MARU_ERR_INVALID;
+    }
+
     rhi_device_desc_t device_desc = {0};
     device_desc.backend = map_backend_to_backend_key(want);
     device_desc.native_window = NULL;
-    device_desc.width = 1024;
-    device_desc.height = 768;
-    device_desc.vsync = true;
+    device_desc.width = win_w;
+    device_desc.height = win_h;
+    device_desc.vsync = win_vsync;
 
     if (engine_context_select_rhi(&g_ctx, want, &device_desc) != MARU_OK) {
         if (strcmp(want, "gl") != 0 && engine_context_select_rhi(&g_ctx, "gl", &device_desc) == MARU_OK) {
@@ -71,6 +82,13 @@ int maru_engine_init(const char *config_path) {
 
     initialized = 1;
     return MARU_OK;
+}
+
+bool maru_engine_tick() {
+    if (!initialized) return false;
+    if (platform_should_close(g_ctx.window)) return false;
+
+    platform_poll_events();
 }
 
 void maru_engine_shutdown(void) {

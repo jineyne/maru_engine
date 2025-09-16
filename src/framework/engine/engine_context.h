@@ -33,6 +33,8 @@ typedef struct engine_context {
 
     const rhi_dispatch_t *active_rhi;
     rhi_device_t *active_device;
+
+    struct platform_window *window;
 } engine_context_t;
 
 void engine_context_init(engine_context_t *ctx);

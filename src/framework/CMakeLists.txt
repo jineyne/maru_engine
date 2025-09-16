@@ -17,6 +17,7 @@ install(TARGETS maru
 
 if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PUBLIC MARU_PLATFORM_WINDOWS)
+    target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 elseif(ANDROID)
     target_compile_definitions(${PROJECT_NAME} PUBLIC MARU_PLATFORM_ANDROID)
 elseif(APPLE)

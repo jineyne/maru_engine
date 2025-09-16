@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "platform/window.h"
+
 typedef int (*maru_plugin_init_fn)(void);
 typedef void (*maru_plugin_shutdown_fn)(void);
 typedef const rhi_dispatch_t * (*maru_rhi_entry_fn)(void);
@@ -16,6 +18,7 @@ static void shutdown_slot(plugin_handler_t *ph) {
 void engine_context_init(engine_context_t *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     ctx->lock = maru_mutex_create();
+    ctx->window = NULL;
 }
 
 void engine_context_shutdown(engine_context_t *ctx) {
@@ -40,8 +43,14 @@ void engine_context_shutdown(engine_context_t *ctx) {
         memset(&ctx->slots[s], 0, sizeof(ctx->slots[s]));
     }
 
+    if (ctx->window) {
+        platform_window_destroy(ctx->window);
+        ctx->window = NULL;
+    }
+
     maru_mutex_unlock(ctx->lock);
     maru_mutex_destroy(ctx->lock);
+    ctx->lock = NULL;
 }
 
 int engine_context_load_plugin(engine_context_t *ctx, maru_plugin_slot_e slot, const char *basename) {
