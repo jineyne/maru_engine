@@ -3,12 +3,28 @@
 #include "config.h"
 #include "plugin/plugin.h"
 #include "rhi/rhi.h"
+#include "engine_context.h"
 
 #include <string.h>
 
+
+static engine_context_t g_ctx;
+
 static int initialized = 0;
 
-plugin_handler_t g_rhi_plugin;
+static const char *map_backend_to_regname(const char *backend) {
+    if (!backend) return "gl";
+    if (strcmp(backend, "dx") == 0 || strcmp(backend, "dx11") == 0) return "dx11";
+    if (strcmp(backend, "gles") == 0) return "gles";
+    return "gl";
+}
+
+static const rhi_backend map_backend_to_backend_key(const char* backend) {
+    if (!backend) RHI_BACKEND_GL;
+    if (strcmp(backend, "dx") == 0 || strcmp(backend, "dx11") == 0) return RHI_BACKEND_DX11;
+    if (strcmp(backend, "gles") == 0) return RHI_BACKEND_GLES;
+    return RHI_BACKEND_GL;
+}
 
 int maru_engine_init(const char *config_path) {
     if (initialized) {
@@ -23,59 +39,33 @@ int maru_engine_init(const char *config_path) {
         return MARU_ERR_PARSE;
     }
 
-    const char *rhi_base = (cfg.graphics_backend && strcmp(cfg.graphics_backend, "dx11") == 0)
-                               ? "maru-dx11"
-                               : "maru-gl";
+    engine_context_init(&g_ctx);
 
-    g_rhi_plugin = load_plugin(rhi_base);
-    if (!plugin_is_valid(&g_rhi_plugin)) {
-        ERROR("rhi plugin load failed: %s", rhi_base);
-        return MARU_ERR_INVALID;
-    }
+    engine_context_load_rhi(&g_ctx, "maru-gl", "gl");
+    // engine_context_load_rhi(&g_ctx, "maru-gles", "gles");
+#if defined(_WIN32)
+    engine_context_load_rhi(&g_ctx, "maru-dx11", "dx11");
+#endif
 
-    maru_plugin_init_fn initf = (maru_plugin_init_fn)plugin_get_symbol(&g_rhi_plugin, "maru_plugin_init");
-    if (initf) {
-        if (initf() != 0) {
-            ERROR("plugin init failed: %s", rhi_base);
-            unload_plugin(&g_rhi_plugin);
+    const char *want = map_backend_to_regname(cfg.graphics_backend);
+    rhi_device_desc_t device_desc = {0};
+    device_desc.backend = map_backend_to_backend_key(want);
+    device_desc.native_window = NULL;
+    device_desc.width = 1024;
+    device_desc.height = 768;
+    device_desc.vsync = true;
+
+    if (engine_context_select_rhi(&g_ctx, want, &device_desc) != MARU_OK) {
+        if (strcmp(want, "gl") != 0 && engine_context_select_rhi(&g_ctx, "gl", &device_desc) == MARU_OK) {
+            INFO("RHI fallback to gl");
+        } else if (strcmp(want, "gles") != 0 && engine_context_select_rhi(&g_ctx, "gles", &device_desc) == MARU_OK) {
+            INFO("RHI fallback to gles");
+        } else {
+            ERROR("no usable RHI backend (wanted: %s)", want);
+            engine_context_shutdown(&g_ctx);
             return MARU_ERR_INVALID;
         }
     }
-
-    maru_rhi_entry_fn rhi_entry = (maru_rhi_entry_fn)plugin_get_symbol(&g_rhi_plugin, "maru_rhi_entry");
-    if (!rhi_entry) {
-        ERROR("rhi entry not found in plugin: %s", rhi_base);
-
-        maru_plugin_shutdown_fn sh = (maru_plugin_shutdown_fn)plugin_get_symbol(&g_rhi_plugin, "maru_plugin_shutdown");
-        if (sh) sh();
-        unload_plugin(&g_rhi_plugin);
-        return MARU_ERR_INVALID;
-    }
-
-    const rhi_dispatch_t *disp = rhi_entry();
-    if (!disp) {
-        ERROR("rhi dispatch is NULL: %s", rhi_base);
-        maru_plugin_shutdown_fn sh = (maru_plugin_shutdown_fn)plugin_get_symbol(&g_rhi_plugin, "maru_plugin_shutdown");
-        if (sh) sh();
-        unload_plugin(&g_rhi_plugin);
-        return MARU_ERR_INVALID;
-    }
-
-    rhi_device_desc_t desc = {0};
-    desc.backend = (strcmp(rhi_base, "maru-dx11") == 0) ? RHI_BACKEND_DX11 : RHI_BACKEND_GL;
-    desc.width = 1024;
-    desc.height = 768;
-    desc.vsync = true;
-
-    rhi_device_t *device = disp->create_device(&desc);
-    if (!device) {
-        ERROR("failed to create rhi device");
-        maru_plugin_shutdown_fn sh = (maru_plugin_shutdown_fn)plugin_get_symbol(&g_rhi_plugin, "maru_plugin_shutdown");
-        if (sh) sh();
-        unload_plugin(&g_rhi_plugin);
-        return MARU_ERR_INVALID;
-    }
-    disp->destroy_device(device);
 
     initialized = 1;
     return MARU_OK;
@@ -84,12 +74,9 @@ int maru_engine_init(const char *config_path) {
 void maru_engine_shutdown(void) {
     if (!initialized) return;
 
+    engine_context_shutdown(&g_ctx);
+
     INFO("maru shutdown");
-
-    maru_plugin_shutdown_fn sh = (maru_plugin_shutdown_fn)plugin_get_symbol(&g_rhi_plugin, "maru_plugin_shutdown");
-    if (sh) sh();
-
-    unload_plugin(&g_rhi_plugin);
 
     initialized = 0;
 }

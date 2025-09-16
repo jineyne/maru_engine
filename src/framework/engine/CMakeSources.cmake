@@ -3,6 +3,7 @@ set(ENGINE_RHI_SRC
 
 set(ENGINE_NOFILTER_SRC
     "engine/engine.c"
+    "engine/engine_context.c"
     "engine/module.c"
     "engine/module.c"
     "engine/config.c")

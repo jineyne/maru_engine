@@ -63,7 +63,7 @@ plugin_handler_t load_plugin(const char *basename) {
 
 #ifdef MARU_PLATFORM_IOS
     INFO("load_plugin: dynamic loading skipped on iOS");
-    (void)basename;
+    UNUSED(basename);
     return h;
 #else
     DYNLIB lib = try_load_variants_internal(basename);

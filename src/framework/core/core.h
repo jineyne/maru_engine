@@ -8,5 +8,6 @@
 #include "json.h"
 #include "time.h"
 #include "export.h"
+#include "macro.h"
 
 #endif /* MARU_CORE_H */
