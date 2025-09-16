@@ -52,6 +52,10 @@ static void gl_present(rhi_swapchain_t *s) {
     UNUSED(s); /* swap buffers here */
 }
 
+static void gl_resize(rhi_device_t* d, int w, int h) {
+    UNUSED(d); UNUSED(w); UNUSED(h);
+}
+
 static rhi_buffer_t *gl_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t *desc, const void *initial) {
     UNUSED(d);
     UNUSED(initial);
@@ -173,6 +177,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         gl_create_device, gl_destroy_device,
         /* swapchain */
         gl_get_swapchain, gl_present,
+        gl_resize,
         /* resources */
         gl_create_buffer, gl_destroy_buffer,
         gl_create_texture, gl_destroy_texture,

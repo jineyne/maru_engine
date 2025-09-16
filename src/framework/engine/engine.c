@@ -31,8 +31,8 @@ static void create_triangle_resources(void) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
     float vtx[] = {
-        /* top    */  0.0f,  0.5f, 0.0f, 1, 0, 0,
-        /* right  */  0.5f, -0.5f, 0.0f, 0, 0, 1,
+        /* top    */ 0.0f, 0.5f, 0.0f, 1, 0, 0,
+        /* right  */ 0.5f, -0.5f, 0.0f, 0, 0, 1,
         /* left   */ -0.5f, -0.5f, 0.0f, 0, 1, 0,
     };
     rhi_buffer_desc_t bd = {0};
@@ -130,6 +130,18 @@ bool maru_engine_tick(void) {
     if (!initialized) return false;
     if (platform_should_close(g_ctx.window)) return false;
     platform_poll_events();
+
+    int cur_w = 0, cur_h = 0;
+    platform_window_get_size(g_ctx.window, &cur_w, &cur_h);
+    static int last_w = 0, last_h = 0;
+    if (cur_w > 0 && cur_h > 0 && (cur_w != last_w || cur_h != last_h)) {
+        if (g_ctx.active_rhi && g_ctx.active_rhi->resize) {
+            g_ctx.active_rhi->resize(g_ctx.active_device, cur_w, cur_h);
+        }
+
+        last_w = cur_w;
+        last_h = cur_h;
+    }
 
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
     rhi_cmd_t *cmd = rhi->begin_cmd(g_ctx.active_device);

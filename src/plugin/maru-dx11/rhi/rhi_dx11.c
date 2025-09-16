@@ -189,6 +189,31 @@ static void dx11_present(rhi_swapchain_t *s) {
     IDXGISwapChain_Present(s->st->sc, s->st->vsync ? 1 : 0, 0);
 }
 
+static void dx11_resize(rhi_device_t* d, int new_w, int new_h) {
+    if (!d || !d->st || !d->st->sc) return;
+    dx11_state_t* st = d->st;
+
+    if (new_w <= 0 || new_h <= 0) return;
+    if (st->w == new_w && st->h == new_h) return;
+
+    if (st->rtv) {
+        ID3D11RenderTargetView_Release(st->rtv); st->rtv = NULL;
+    }
+
+    st->w = new_w;
+    st->h = new_h;
+    HRESULT hr = IDXGISwapChain_ResizeBuffers(st->sc, 0, (UINT)new_w, (UINT)new_h, DXGI_FORMAT_UNKNOWN, 0);
+    if (FAILED(hr)) {
+        FATAL("DX11 ResizeBuffers failed: 0x%08X", (unsigned)hr);
+        return;
+    }
+
+    if (dx11_create_backbuffer_rtv(st) != 0) {
+        FATAL("DX11 recreate RTV failed after resize");
+        return;
+    }
+}
+
 static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t *desc, const void *initial) {
     if (!d || !d->st || !desc || desc->size == 0) return NULL;
 
@@ -445,6 +470,8 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         dx11_create_device, dx11_destroy_device,
         /* swapchain */
         dx11_get_swapchain, dx11_present,
+        /* resize */
+        dx11_resize,
         /* resources */
         dx11_create_buffer, dx11_destroy_buffer,
         dx11_create_texture, dx11_destroy_texture,

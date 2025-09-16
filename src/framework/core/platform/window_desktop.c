@@ -72,4 +72,20 @@ int platform_should_close(platform_window_t *pw) {
     return glfwWindowShouldClose((GLFWwindow*)pw->impl);
 }
 
+void platform_window_get_size(platform_window_t* pw, int* out_w, int* out_h) {
+    if (!pw) return;
+
+    int w = 0, h = 0;
+    glfwGetFramebufferSize((GLFWwindow*)pw->impl, &w, &h);
+    if (out_w) {
+        *out_w = w;
+    }
+    if (out_h) {
+        *out_h = h;
+    }
+
+    pw->width = w;
+    pw->height = h;
+}
+
 #endif

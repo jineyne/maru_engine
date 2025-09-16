@@ -103,6 +103,8 @@ typedef struct rhi_dispatch {
     rhi_swapchain_t * (*get_swapchain)(rhi_device_t *);
     void (*present)(rhi_swapchain_t *);
 
+    void (*resize)(rhi_device_t*, int new_w, int new_h);
+
     /* resources */
     rhi_buffer_t * (*create_buffer)(rhi_device_t *, const rhi_buffer_desc_t *, const void *initial);
     void (*destroy_buffer)(rhi_device_t *, rhi_buffer_t *);

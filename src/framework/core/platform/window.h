@@ -23,6 +23,8 @@ void platform_window_destroy(platform_window_t *pw);
 void platform_poll_events(void);
 int platform_should_close(platform_window_t *pw);
 
+void platform_window_get_size(platform_window_t *pw, int *out_w, int *out_h);
+
 #ifdef __cplusplus
 }
 #endif
