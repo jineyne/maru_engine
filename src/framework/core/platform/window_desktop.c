@@ -37,19 +37,19 @@ platform_window_t *platform_window_create(void *native_handle, int width, int he
         return NULL;
     }
 
-    platform_window_t *pw = (platform_window_t*)calloc(1, sizeof(platform_window_t));
+    platform_window_t *pw = (platform_window_t*) calloc(1, sizeof(platform_window_t));
     pw->width = width;
     pw->height = height;
     pw->vsync = vsync ? 1 : 0;
 
 #ifdef _WIN32
-    pw->handle = (void*)glfwGetWin32Window(win); /* HWND */
+    pw->handle = (void*) glfwGetWin32Window(win); /* HWND */
 #elif defined(__APPLE__)
     pw->handle = glfwGetCocoaWindow(s_glfw);                  /* NSWindow* */
 #else
     pw->handle = (void*)(uintptr_t)glfwGetX11Window(s_glfw);  /* ::Window */
 #endif
-    pw->impl = (void*)win;
+    pw->impl = (void*) win;
 
     INFO("platform_window_create: desktop GLFW window %dx%d vsync=%d", width, height, pw->vsync);
     return pw;
@@ -58,7 +58,7 @@ platform_window_t *platform_window_create(void *native_handle, int width, int he
 void platform_window_destroy(platform_window_t *pw) {
     if (!pw) return;
     if (pw->handle) {
-        glfwDestroyWindow((GLFWwindow*)pw->impl);
+        glfwDestroyWindow((GLFWwindow*) pw->impl);
     }
     free(pw);
     glfwTerminate();
@@ -69,14 +69,14 @@ void platform_poll_events() {
 }
 
 int platform_should_close(platform_window_t *pw) {
-    return glfwWindowShouldClose((GLFWwindow*)pw->impl);
+    return glfwWindowShouldClose((GLFWwindow*) pw->impl);
 }
 
-void platform_window_get_size(platform_window_t* pw, int* out_w, int* out_h) {
+void platform_window_get_size(platform_window_t *pw, int *out_w, int *out_h) {
     if (!pw) return;
 
     int w = 0, h = 0;
-    glfwGetFramebufferSize((GLFWwindow*)pw->impl, &w, &h);
+    glfwGetFramebufferSize((GLFWwindow*) pw->impl, &w, &h);
     if (out_w) {
         *out_w = w;
     }
