@@ -56,6 +56,13 @@ typedef enum rhi_stage_bits {
     RHI_STAGE_PS = 1 << 1,
 } rhi_stage_bits;
 
+typedef enum rhi_buffer_usage_bits {
+    RHI_BUF_VERTEX = 1 << 0,
+    RHI_BUF_INDEX = 1 << 1,
+    RHI_BUF_CONST = 1 << 2,
+    RHI_BUF_DYNAMIC = 1 << 16
+} rhi_buffer_usage_bits;
+
 typedef enum rhi_tex_usage_bits {
     RHI_TEX_USAGE_SAMPLED = 1 << 0,
     RHI_TEX_USAGE_RENDER_TARGET = 1 << 1,
@@ -97,7 +104,7 @@ typedef struct rhi_pipeline_desc {
 } rhi_pipeline_desc_t;
 
 typedef struct rhi_rt_attachment_desc {
-    rhi_texture_t* texture;
+    rhi_texture_t *texture;
     int mip_level;
     int array_slice;
 } rhi_rt_attachment_desc_t;
@@ -129,6 +136,7 @@ typedef struct rhi_dispatch {
     /* resources */
     rhi_buffer_t * (*create_buffer)(rhi_device_t *, const rhi_buffer_desc_t *, const void *initial);
     void (*destroy_buffer)(rhi_device_t *, rhi_buffer_t *);
+    void (*update_buffer)(rhi_device_t *, rhi_buffer_t *, const void *data, size_t bytes);
 
     rhi_texture_t * (*create_texture)(rhi_device_t *, const rhi_texture_desc_t *, const void *initial);
     void (*destroy_texture)(rhi_device_t *, rhi_texture_t *);
@@ -148,11 +156,12 @@ typedef struct rhi_dispatch {
     rhi_cmd_t * (*begin_cmd)(rhi_device_t *);
     void (*end_cmd)(rhi_cmd_t *);
 
-    void (*cmd_begin_render)(rhi_cmd_t*, rhi_render_target_t* rt, const float clear_rgba[4]);
+    void (*cmd_begin_render)(rhi_cmd_t *, rhi_render_target_t *rt, const float clear_rgba[4]);
     void (*cmd_end_render)(rhi_cmd_t *);
 
     void (*cmd_bind_pipeline)(rhi_cmd_t *, rhi_pipeline_t *);
     void (*cmd_bind_set)(rhi_cmd_t *, const rhi_binding_t *binds, int num, uint32_t stages_mask);
+    void (*cmd_bind_const_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *, uint32_t stages_mask);
 
     void (*cmd_set_viewport_scissor)(rhi_cmd_t *, int x, int y, int w, int h);
     void (*cmd_set_vertex_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *);

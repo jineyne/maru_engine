@@ -127,7 +127,7 @@ static int dx11_create_backbuffer_rtv(dx11_state_t *st) {
 static void dx11_refresh_backbuffer_rt(dx11_state_t *st) {
     if (!st || !st->rtv) return;
     if (!st->back_rt) {
-        st->back_rt = (rhi_render_target_t*)calloc(1, sizeof(rhi_render_target_t));
+        st->back_rt = (rhi_render_target_t*) calloc(1, sizeof(rhi_render_target_t));
     }
 
     dx11_rt_t *rt = &st->back_rt->rt;
@@ -205,10 +205,10 @@ static int dx11_srv_conflicts_with_rt(ID3D11ShaderResourceView *srv, dx11_rt_t *
 static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
     if (!desc || !desc->native_window) return NULL;
 
-    dx11_state_t *st = (dx11_state_t*)calloc(1, sizeof(dx11_state_t));
+    dx11_state_t *st = (dx11_state_t*) calloc(1, sizeof(dx11_state_t));
     if (!st) return NULL;
 
-    st->hwnd = (HWND)desc->native_window;
+    st->hwnd = (HWND) desc->native_window;
     st->w = (desc->width > 0) ? desc->width : 1280;
     st->h = (desc->height > 0) ? desc->height : 720;
     st->vsync = desc->vsync ? 1 : 0;
@@ -252,7 +252,7 @@ static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
 
     dx11_refresh_backbuffer_rt(st);
 
-    rhi_device_t *dev = (rhi_device_t*)calloc(1, sizeof(rhi_device_t));
+    rhi_device_t *dev = (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
     if (!dev) {
         dx11_release_all(st);
         free(st);
@@ -275,7 +275,7 @@ static void dx11_destroy_device(rhi_device_t *d) {
 
 static rhi_swapchain_t *dx11_get_swapchain(rhi_device_t *desc) {
     if (!desc || !desc->st) return NULL;
-    rhi_swapchain_t *s = (rhi_swapchain_t*)calloc(1, sizeof(rhi_swapchain_t));
+    rhi_swapchain_t *s = (rhi_swapchain_t*) calloc(1, sizeof(rhi_swapchain_t));
     if (!s) return NULL;
     s->st = desc->st;
     return s;
@@ -325,9 +325,24 @@ static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     if (!d || !d->st || !desc || desc->size == 0) return NULL;
 
     D3D11_BUFFER_DESC bd = {0};
-    bd.ByteWidth = (UINT)desc->size;
+    bd.ByteWidth = (UINT) ALIGN_UP(desc->size, 16);
     bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+    if (desc->usage & RHI_BUF_VERTEX) {
+        bd.BindFlags |= D3D11_BIND_VERTEX_BUFFER;
+    }
+
+    if (desc->usage & RHI_BUF_INDEX) {
+        bd.BindFlags |= D3D11_BIND_INDEX_BUFFER;
+    }
+
+    if (desc->usage & RHI_BUF_CONST) {
+        bd.BindFlags |= D3D11_BIND_CONSTANT_BUFFER;
+    }
+
+    if (bd.Usage == D3D11_USAGE_DYNAMIC) {
+        bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    }
 
     D3D11_SUBRESOURCE_DATA srd = {0};
     srd.pSysMem = initial;
@@ -336,10 +351,28 @@ static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     HRESULT hr = ID3D11Device_CreateBuffer(d->st->dev, &bd, initial ? &srd : NULL, &buf);
     if (FAILED(hr)) return NULL;
 
-    rhi_buffer_t *b = (rhi_buffer_t*)calloc(1, sizeof(rhi_buffer_t));
+    rhi_buffer_t *b = (rhi_buffer_t*) calloc(1, sizeof(rhi_buffer_t));
     b->vb.buf = buf;
     b->vb.size = desc->size;
+    b->vb.stride = 0;
+    b->vb.offset = 0;
     return b;
+}
+
+static void dx11_update_buffer(rhi_device_t *d, rhi_buffer_t *b, const void *data, size_t bytes) {
+    if (!d || !d->st || !b || !b->vb.buf || !data || bytes == 0) return;
+
+    D3D11_BUFFER_DESC bd;
+    ID3D11Buffer_GetDesc(b->vb.buf, &bd);
+    if (bd.Usage == D3D11_USAGE_DYNAMIC) {
+        D3D11_MAPPED_SUBRESOURCE ms;
+        if (SUCCEEDED(ID3D11DeviceContext_Map(d->st->ctx, (ID3D11Resource *)b->vb.buf, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms))) {
+            memcpy(ms.pData, data, bytes);
+            ID3D11DeviceContext_Unmap(d->st->ctx, (ID3D11Resource *)b->vb.buf, 0);
+        }
+    } else {
+        ID3D11DeviceContext_UpdateSubresource(d->st->ctx, (ID3D11Resource *)b->vb.buf, 0, NULL, data, 0, 0);
+    }
 }
 
 static void dx11_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
@@ -356,7 +389,7 @@ static void dx11_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
 static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_desc_t *desc, const void *initial) {
     UNUSED(initial);
 
-    dx11_state_t *st = ((struct rhi_device*)d)->st;
+    dx11_state_t *st = ((struct rhi_device*) d)->st;
     HRESULT hr = S_OK;
 
     const bool wantSRV = (desc->usage & RHI_TEX_USAGE_SAMPLED) != 0;
@@ -384,7 +417,7 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
     }
 
 
-    rhi_texture_t *tex = (rhi_texture_t*)calloc(1, sizeof(*tex));
+    rhi_texture_t *tex = (rhi_texture_t*) calloc(1, sizeof(*tex));
     if (!tex) return NULL;
 
     D3D11_TEXTURE2D_DESC td = {0};
@@ -504,15 +537,24 @@ static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t
     ID3DBlob *vsb = NULL, *psb = NULL, *err = NULL;
     HRESULT hr = D3DCompile(sd->blob_vs, sd->blob_vs_size, "vs", NULL, NULL, sd->entry_vs, "vs_5_0", 0, 0, &vsb, &err);
     if (FAILED(hr)) {
-        if (err)
+        if (err) {
+            const char *msg = (const char*) ID3D10Blob_GetBufferPointer(err);
+            size_t mlen = (size_t) ID3D10Blob_GetBufferSize(err);
+            INFO("HLSL VS compile error:\n%.*s", (int)mlen, msg);
             ID3D10Blob_Release(err);
+        }
+
         return NULL;
     }
     hr = D3DCompile(sd->blob_ps, sd->blob_ps_size, "ps", NULL, NULL, sd->entry_ps, "ps_5_0", 0, 0, &psb, &err);
     if (FAILED(hr)) {
         ID3D10Blob_Release(vsb);
-        if (err)
+        if (err) {
+            const char *msg = (const char*) ID3D10Blob_GetBufferPointer(err);
+            size_t mlen = (size_t) ID3D10Blob_GetBufferSize(err);
+            INFO("HLSL PS compile error:\n%.*s", (int)mlen, msg);
             ID3D10Blob_Release(err);
+        }
         return NULL;
     }
 
@@ -532,7 +574,7 @@ static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t
         return NULL;
     }
 
-    rhi_shader_t *sh = (rhi_shader_t*)calloc(1, sizeof(rhi_shader_t));
+    rhi_shader_t *sh = (rhi_shader_t*) calloc(1, sizeof(rhi_shader_t));
     sh->sh.vs = vs;
     sh->sh.ps = ps;
     sh->sh.vs_blob = vsb;
@@ -561,12 +603,12 @@ static void dx11_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
 
 static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     if (!d || !pd || !pd->shader) return NULL;
-    rhi_pipeline_t *p = (rhi_pipeline_t*)calloc(1, sizeof(rhi_pipeline_t));
+    rhi_pipeline_t *p = (rhi_pipeline_t*) calloc(1, sizeof(rhi_pipeline_t));
     p->p.sh = pd->shader;
 
     D3D11_INPUT_ELEMENT_DESC il[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, (UINT)(sizeof(float) * 3), D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, (UINT) (sizeof(float) * 3), D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
     HRESULT hr = ID3D11Device_CreateInputLayout(d->st->dev, il, 2, ID3D10Blob_GetBufferPointer(p->p.sh->sh.vs_blob), (SIZE_T)ID3D10Blob_GetBufferSize(p->p.sh->sh.vs_blob), &p->p.il);
@@ -630,7 +672,7 @@ static rhi_texture_t *dx11_render_target_get_color_tex(rhi_render_target_t *rt, 
 }
 
 static rhi_cmd_t *dx11_begin_cmd(rhi_device_t *d) {
-    rhi_cmd_t *c = (rhi_cmd_t*)calloc(1, sizeof(rhi_cmd_t));
+    rhi_cmd_t *c = (rhi_cmd_t*) calloc(1, sizeof(rhi_cmd_t));
     if (!c) return NULL;
     c->st = d->st;
     return c;
@@ -660,8 +702,8 @@ static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const f
     D3D11_VIEWPORT vp = {0};
     vp.TopLeftX = 0.0f;
     vp.TopLeftY = 0.0f;
-    vp.Width = (FLOAT)st->w;
-    vp.Height = (FLOAT)st->h;
+    vp.Width = (FLOAT) st->w;
+    vp.Height = (FLOAT) st->h;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     ID3D11DeviceContext_RSSetViewports(st->ctx, 1, &vp);
@@ -708,15 +750,25 @@ static void dx11_cmd_bind_set(rhi_cmd_t *c, const rhi_binding_t *binds, int num,
     }
 }
 
+static void dx11_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, uint32_t stages) {
+    if (!c || !c->st || !b || !b->vb.buf) return;
+    if (stages & RHI_STAGE_VS) {
+        ID3D11DeviceContext_VSSetConstantBuffers(c->st->ctx, (UINT)slot, 1, &b->vb.buf);
+    }
+    if (stages & RHI_STAGE_PS) {
+        ID3D11DeviceContext_PSSetConstantBuffers(c->st->ctx, (UINT)slot, 1, &b->vb.buf);
+    }
+}
+
 static void dx11_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int h) {
     UNUSED(c);
 
     dx11_state_t *st = c->st;
     D3D11_VIEWPORT vp;
-    vp.TopLeftX = (FLOAT)x;
-    vp.TopLeftY = (FLOAT)y;
-    vp.Width = (FLOAT)w;
-    vp.Height = (FLOAT)h;
+    vp.TopLeftX = (FLOAT) x;
+    vp.TopLeftY = (FLOAT) y;
+    vp.Width = (FLOAT) w;
+    vp.Height = (FLOAT) h;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     ID3D11DeviceContext_RSSetViewports(st->ctx, 1, &vp);
@@ -749,7 +801,7 @@ static void dx11_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t fir
 
 static rhi_fence_t *dx11_fence_create(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_fence_t*)calloc(1, sizeof(rhi_fence_t));
+    return (rhi_fence_t*) calloc(1, sizeof(rhi_fence_t));
 }
 
 static void dx11_fence_wait(rhi_fence_t *f) {
@@ -761,12 +813,12 @@ static void dx11_fence_destroy(rhi_fence_t *f) {
 }
 
 static void dx11_get_capabilities(rhi_device_t *dev, rhi_capabilities_t *out) {
-    (void)dev;
+    (void) dev;
     out->min_depth = 0.0f;
     out->max_depth = 1.0f;
     out->conventions.uv_yaxis = RHI_AXIS_DOWN;
     out->conventions.ndc_yaxis = RHI_AXIS_UP;
-    out->conventions.matrix_order = RHI_MATRIX_ROW_MAJOR;
+    out->conventions.matrix_order = RHI_MATRIX_COLUMN_MAJOR;
 }
 
 PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
@@ -778,7 +830,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         /* resize */
         dx11_resize,
         /* resources */
-        dx11_create_buffer, dx11_destroy_buffer,
+        dx11_create_buffer, dx11_destroy_buffer, dx11_update_buffer,
         dx11_create_texture, dx11_destroy_texture,
         dx11_create_shader, dx11_destroy_shader,
         dx11_create_pipeline, dx11_destroy_pipeline,
@@ -788,7 +840,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
 
         /* commands */
         dx11_begin_cmd, dx11_end_cmd, dx11_cmd_begin_render, dx11_cmd_end_render,
-        dx11_cmd_bind_pipeline, dx11_cmd_bind_set,
+        dx11_cmd_bind_pipeline, dx11_cmd_bind_set, dx11_cmd_bind_const_buffer,
         dx11_cmd_set_viewport_scissor, dx11_cmd_set_vertex_buffer, dx11_cmd_set_index_buffer,
         dx11_cmd_draw, dx11_cmd_draw_indexed,
         /* sync */

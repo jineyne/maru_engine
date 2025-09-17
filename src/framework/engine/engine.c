@@ -7,6 +7,8 @@
 
 #include <string.h>
 
+#include "math/math.h"
+#include "math/proj.h"
 #include "platform/window.h"
 
 engine_context_t g_ctx;
@@ -19,10 +21,39 @@ static rhi_buffer_t *g_triangle_vb = NULL;
 static rhi_shader_t *g_triangle_sh = NULL;
 static rhi_pipeline_t *g_triangle_pl = NULL;
 
+static rhi_buffer_t *g_mvp_cb = NULL;
+
+static void update_mvp_from_size(int w, int h) {
+    if (!g_ctx.active_rhi || !g_ctx.active_device || !g_mvp_cb) return;
+
+    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
+
+    rhi_capabilities_t caps;
+    rhi->get_capabilities(g_ctx.active_device, &caps);
+
+    if (h <= 0) h = 1;
+    float aspect = (float) w / (float) h;
+
+    mat4_t P, V, M, PV, MVP;
+    perspective_from_caps(&caps, 60.0f * (3.14159265f / 180.0f), aspect, 0.1f, 100.0f, P);
+
+    vec3_t eye = { 0.f, 0.f, 2.5f };
+    vec3_t at = { 0.f, 0.f, 0.f };
+    vec3_t up = { 0.f, 1.f, 0.f };
+    look_at(eye, at, up, V);
+
+    mat4_identity(M);
+    mat4_mul(P, V, PV);
+    mat4_mul(PV, M, MVP);
+
+    rhi->update_buffer(g_ctx.active_device, g_mvp_cb, &MVP, sizeof(MVP));
+}
+
 static const char *s_vs_hlsl =
+    "cbuffer PerFrame : register(b0) { row_major float4x4 uMVP; };"
     "struct VSIn { float3 pos:POSITION; float3 col:COLOR; };"
     "struct VSOut{ float4 pos:SV_Position; float3 col:COLOR; };"
-    "VSOut main(VSIn i){ VSOut o; o.pos=float4(i.pos,1); o.col=i.col; return o; }";
+    "VSOut main(VSIn i){ VSOut o; o.pos = mul(float4(i.pos,1), uMVP); o.col=i.col; return o; }";
 
 static const char *s_ps_hlsl =
     "struct PSIn{ float4 pos:SV_Position; float3 col:COLOR; };"
@@ -53,6 +84,17 @@ static void create_triangle_resources(void) {
     rhi_pipeline_desc_t pd = {0};
     pd.shader = g_triangle_sh;
     g_triangle_pl = rhi->create_pipeline(g_ctx.active_device, &pd);
+
+    mat4_t zero = { 0 };
+
+    rhi_buffer_desc_t cbd = {0};
+    cbd.size = sizeof(zero);
+    cbd.usage = RHI_BUF_CONST;
+    g_mvp_cb = rhi->create_buffer(g_ctx.active_device, &cbd, &zero);
+
+    int cw = 0, ch = 0;
+    platform_window_get_size(g_ctx.window, &cw, &ch);
+    update_mvp_from_size(cw, ch);
 }
 
 static const char *map_backend_to_regname(const char *backend) {
@@ -150,6 +192,8 @@ bool maru_engine_tick(void) {
         }
     }
 
+    update_mvp_from_size(cur_w, cur_h);
+
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
     rhi_cmd_t *cmd = rhi->begin_cmd(g_ctx.active_device);
 
@@ -157,6 +201,7 @@ bool maru_engine_tick(void) {
     rhi->cmd_begin_render(cmd, g_back_rt, clear);
 
     rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
+    rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
     rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
     rhi->cmd_draw(cmd, 3, 0, 1);
 

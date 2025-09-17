@@ -8,6 +8,8 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory (thirdparty/glfw)
 
+add_subdirectory (thirdparty/cglm)
+
 # Plugins
 add_subdirectory(plugin/maru-gl)
 add_subdirectory(plugin/maru-gles)

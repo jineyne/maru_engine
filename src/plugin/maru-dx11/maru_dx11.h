@@ -1,5 +1,5 @@
-#ifndef MARU_AL_H
-#define MARU_AL_H
+#ifndef MARU_DX11_H
+#define MARU_DX11_H
 
 #include "core.h"
 

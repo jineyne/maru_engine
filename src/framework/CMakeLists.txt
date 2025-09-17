@@ -10,6 +10,8 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/core
         ${CMAKE_CURRENT_SOURCE_DIR}/engine)
 
+target_link_libraries(${PROJECT_NAME} PUBLIC cglm)
+
 install(TARGETS maru
         RUNTIME DESTINATION ${MARU_INSTALL_BIN_DIR}
         LIBRARY DESTINATION ${MARU_INSTALL_LIB_DIR}
