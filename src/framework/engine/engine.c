@@ -25,8 +25,10 @@ static rhi_buffer_t *g_mvp_cb = NULL;
 
 static void update_mvp_from_size(int w, int h) {
     if (!g_ctx.active_rhi || !g_ctx.active_device || !g_mvp_cb) return;
-
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
+
+    static float s_angle = 0.0f;
+    s_angle += 0.8f * (3.14159265f / 180.0f);
 
     rhi_capabilities_t caps;
     rhi->get_capabilities(g_ctx.active_device, &caps);
@@ -34,17 +36,18 @@ static void update_mvp_from_size(int w, int h) {
     if (h <= 0) h = 1;
     float aspect = (float) w / (float) h;
 
-    mat4_t P, V, M, PV, MVP;
+    mat4_t P, V, M, R, PV, MVP;
     perspective_from_caps(&caps, 60.0f * (3.14159265f / 180.0f), aspect, 0.1f, 100.0f, P);
 
-    vec3_t eye = { 0.f, 0.f, 2.5f };
-    vec3_t at = { 0.f, 0.f, 0.f };
-    vec3_t up = { 0.f, 1.f, 0.f };
+    vec3_t eye = {0.f, 0.f, 2.5f};
+    vec3_t at = {0.f, 0.f, 0.f};
+    vec3_t up = {0.f, 1.f, 0.f};
     look_at(eye, at, up, V);
 
     mat4_identity(M);
+    glm_rotate_y(M, s_angle, R);
     mat4_mul(P, V, PV);
-    mat4_mul(PV, M, MVP);
+    mat4_mul(PV, R, MVP);
 
     rhi->update_buffer(g_ctx.active_device, g_mvp_cb, &MVP, sizeof(MVP));
 }
@@ -85,7 +88,7 @@ static void create_triangle_resources(void) {
     pd.shader = g_triangle_sh;
     g_triangle_pl = rhi->create_pipeline(g_ctx.active_device, &pd);
 
-    mat4_t zero = { 0 };
+    mat4_t zero = {0};
 
     rhi_buffer_desc_t cbd = {0};
     cbd.size = sizeof(zero);

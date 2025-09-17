@@ -77,6 +77,7 @@ typedef struct dx11_rt {
     ID3D11RenderTargetView *rtvs[4];
     int color_count;
     ID3D11DepthStencilView *dsv;
+    ID3D11Texture2D *ds_tex;
     int is_backbuffer;
 } dx11_rt_t;
 
@@ -114,6 +115,42 @@ static void dx11_release_all(dx11_state_t *st) {
     }
 }
 
+static void dx11_rt_release_depth(dx11_rt_t *rt) {
+    if (!rt) return;
+    if (rt->dsv) {
+        ID3D11DepthStencilView_Release(rt->dsv);
+        rt->dsv = NULL;
+    }
+    if (rt->ds_tex) {
+        ID3D11Texture2D_Release(rt->ds_tex);
+        rt->ds_tex = NULL;
+    }
+}
+
+static int dx11_rt_create_depth(dx11_state_t *st, dx11_rt_t *rt, int w, int h) {
+    if (!st || !rt || !st->dev) return -1;
+    dx11_rt_release_depth(rt);
+
+    D3D11_TEXTURE2D_DESC td = { 0 };
+    td.Width = (UINT)w;
+    td.Height = (UINT)h;
+    td.MipLevels = 1;
+    td.ArraySize = 1;
+    td.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    td.SampleDesc.Count = 1;
+    td.Usage = D3D11_USAGE_DEFAULT;
+    td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+    HRESULT hr = ID3D11Device_CreateTexture2D(st->dev, &td, NULL, &rt->ds_tex);
+    if (FAILED(hr)) return -1;
+
+    D3D11_DEPTH_STENCIL_VIEW_DESC dvd = { 0 };
+    dvd.Format = td.Format;
+    dvd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    hr = ID3D11Device_CreateDepthStencilView(st->dev, (ID3D11Resource *)rt->ds_tex, &dvd, &rt->dsv);
+    return FAILED(hr) ? -1 : 0;
+}
+
 static int dx11_create_backbuffer_rtv(dx11_state_t *st) {
     ID3D11Texture2D *backbuf = NULL;
     HRESULT hr = IDXGISwapChain_GetBuffer(st->sc, 0, &IID_ID3D11Texture2D, (void**)&backbuf);
@@ -137,6 +174,10 @@ static void dx11_refresh_backbuffer_rt(dx11_state_t *st) {
     rt->color_count = 1;
     rt->rtvs[0] = st->rtv;
     rt->dsv = NULL;
+
+    if (dx11_rt_create_depth(st, rt, st->w, st->h) != 0) {
+        dx11_rt_release_depth(rt);
+    }
 }
 
 static void dx11_drop_backbuffer_rt(dx11_state_t *st) {
@@ -697,7 +738,8 @@ static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const f
     }
 
     ID3D11RenderTargetView *rtv = use_rt->rt.rtvs[0];
-    ID3D11DeviceContext_OMSetRenderTargets(st->ctx, 1, &rtv, NULL);
+    ID3D11DepthStencilView *dsv = use_rt->rt.dsv;
+    ID3D11DeviceContext_OMSetRenderTargets(st->ctx, 1, &rtv, dsv);
 
     D3D11_VIEWPORT vp = {0};
     vp.TopLeftX = 0.0f;
@@ -710,6 +752,10 @@ static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const f
 
     if (clear_rgba) {
         ID3D11DeviceContext_ClearRenderTargetView(st->ctx, rtv, clear_rgba);
+    }
+
+    if (dsv) {
+        ID3D11DeviceContext_ClearDepthStencilView(st->ctx, dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
     }
 
     dx11_unbind_all_srvs(st);
