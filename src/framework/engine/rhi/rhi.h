@@ -35,6 +35,7 @@ typedef struct rhi_buffer rhi_buffer_t;
 typedef struct rhi_texture rhi_texture_t;
 typedef struct rhi_shader rhi_shader_t;
 typedef struct rhi_pipeline rhi_pipeline_t;
+typedef struct rhi_render_target rhi_render_target_t;
 typedef struct rhi_cmd rhi_cmd_t;
 typedef struct rhi_fence rhi_fence_t;
 
@@ -54,6 +55,13 @@ typedef enum rhi_stage_bits {
     RHI_STAGE_VS = 1 << 0,
     RHI_STAGE_PS = 1 << 1,
 } rhi_stage_bits;
+
+typedef enum rhi_tex_usage_bits {
+    RHI_TEX_USAGE_SAMPLED = 1 << 0,
+    RHI_TEX_USAGE_RENDER_TARGET = 1 << 1,
+    RHI_TEX_USAGE_DEPTH = 1 << 2,
+    RHI_TEX_USAGE_GEN_MIPS = 1 << 3,
+} rhi_tex_usage_bits;
 
 typedef struct rhi_device_desc {
     rhi_backend backend; /* informational */
@@ -88,6 +96,19 @@ typedef struct rhi_pipeline_desc {
     //TODO: blend/depth/raster/vertex-layout
 } rhi_pipeline_desc_t;
 
+typedef struct rhi_rt_attachment_desc {
+    rhi_texture_t* texture;
+    int mip_level;
+    int array_slice;
+} rhi_rt_attachment_desc_t;
+
+typedef struct rhi_render_target_desc {
+    rhi_rt_attachment_desc_t color[4];
+    int color_count;
+    rhi_rt_attachment_desc_t depth;
+    int samples; /* 0/1 = no MSAA */
+} rhi_render_target_desc_t;
+
 typedef struct rhi_binding {
     uint32_t binding; /* abstract slot */
     rhi_texture_t *texture; /* SRV */
@@ -103,7 +124,7 @@ typedef struct rhi_dispatch {
     rhi_swapchain_t * (*get_swapchain)(rhi_device_t *);
     void (*present)(rhi_swapchain_t *);
 
-    void (*resize)(rhi_device_t*, int new_w, int new_h);
+    void (*resize)(rhi_device_t *, int new_w, int new_h);
 
     /* resources */
     rhi_buffer_t * (*create_buffer)(rhi_device_t *, const rhi_buffer_desc_t *, const void *initial);
@@ -118,10 +139,16 @@ typedef struct rhi_dispatch {
     rhi_pipeline_t * (*create_pipeline)(rhi_device_t *, const rhi_pipeline_desc_t *);
     void (*destroy_pipeline)(rhi_device_t *, rhi_pipeline_t *);
 
+    rhi_render_target_t * (*create_render_target)(rhi_device_t *, const rhi_render_target_desc_t *);
+    void (*destroy_render_target)(rhi_device_t *, rhi_render_target_t *);
+    rhi_render_target_t * (*get_backbuffer_rt)(rhi_device_t *);
+    rhi_texture_t * (*render_target_get_color_tex)(rhi_render_target_t *, int index);
+
     /* commands */
     rhi_cmd_t * (*begin_cmd)(rhi_device_t *);
     void (*end_cmd)(rhi_cmd_t *);
-    void (*cmd_begin_render)(rhi_cmd_t *, rhi_texture_t *color, rhi_texture_t *depth, const float clear_rgba[4]);
+
+    void (*cmd_begin_render)(rhi_cmd_t*, rhi_render_target_t* rt, const float clear_rgba[4]);
     void (*cmd_end_render)(rhi_cmd_t *);
 
     void (*cmd_bind_pipeline)(rhi_cmd_t *, rhi_pipeline_t *);

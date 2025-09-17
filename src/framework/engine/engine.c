@@ -13,6 +13,7 @@ engine_context_t g_ctx;
 
 static int initialized = 0;
 static rhi_swapchain_t *g_swapchain = NULL;
+static rhi_render_target_t *g_back_rt = NULL;
 
 static rhi_buffer_t *g_triangle_vb = NULL;
 static rhi_shader_t *g_triangle_sh = NULL;
@@ -62,7 +63,6 @@ static const char *map_backend_to_regname(const char *backend) {
 }
 
 static const rhi_backend map_backend_to_backend_key(const char *backend) {
-    /* FIX: ´©¶ôµÈ return */
     if (!backend) return RHI_BACKEND_GL;
     if (strcmp(backend, "dx") == 0 || strcmp(backend, "dx11") == 0) return RHI_BACKEND_DX11;
     if (strcmp(backend, "gles") == 0) return RHI_BACKEND_GLES;
@@ -92,7 +92,7 @@ int maru_engine_init(const char *config_path) {
     const char *want = map_backend_to_regname(cfg.graphics_backend);
 
     int win_w = 1024, win_h = 768, win_vsync = 1;
-    g_ctx.window = platform_window_create(/*native_handle=*/NULL, win_w, win_h, win_vsync);
+    g_ctx.window = platform_window_create(NULL, win_w, win_h, win_vsync);
     if (!g_ctx.window) {
         ERROR("Failed to create platform window");
         engine_context_shutdown(&g_ctx);
@@ -119,6 +119,7 @@ int maru_engine_init(const char *config_path) {
     }
 
     g_swapchain = g_ctx.active_rhi->get_swapchain(g_ctx.active_device);
+    g_back_rt = g_ctx.active_rhi->get_backbuffer_rt(g_ctx.active_device);
 
     create_triangle_resources();
 
@@ -133,21 +134,22 @@ bool maru_engine_tick(void) {
 
     int cur_w = 0, cur_h = 0;
     platform_window_get_size(g_ctx.window, &cur_w, &cur_h);
-    static int last_w = 0, last_h = 0;
-    if (cur_w > 0 && cur_h > 0 && (cur_w != last_w || cur_h != last_h)) {
-        if (g_ctx.active_rhi && g_ctx.active_rhi->resize) {
-            g_ctx.active_rhi->resize(g_ctx.active_device, cur_w, cur_h);
-        }
+    if (g_ctx.active_rhi && g_ctx.active_rhi->resize) {
+        g_ctx.active_rhi->resize(g_ctx.active_device, cur_w, cur_h);
 
-        last_w = cur_w;
-        last_h = cur_h;
+        if (g_ctx.active_rhi->get_backbuffer_rt) {
+            rhi_render_target_t *new_rt = g_ctx.active_rhi->get_backbuffer_rt(g_ctx.active_device);
+            if (new_rt) {
+                g_back_rt = new_rt;
+            }
+        }
     }
 
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
     rhi_cmd_t *cmd = rhi->begin_cmd(g_ctx.active_device);
 
     const float clear[4] = {0.2f, 0.2f, 0.6f, 1.0f};
-    rhi->cmd_begin_render(cmd, NULL, NULL, clear);
+    rhi->cmd_begin_render(cmd, g_back_rt, clear);
 
     rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
     rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
@@ -156,9 +158,8 @@ bool maru_engine_tick(void) {
     rhi->cmd_end_render(cmd);
     rhi->end_cmd(cmd);
 
-    static rhi_swapchain_t *sc = NULL;
-    if (!sc) sc = rhi->get_swapchain(g_ctx.active_device);
-    rhi->present(sc);
+    if (!g_swapchain) g_swapchain = rhi->get_swapchain(g_ctx.active_device);
+    rhi->present(g_swapchain);
     return true;
 }
 

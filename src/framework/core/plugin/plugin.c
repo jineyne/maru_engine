@@ -57,7 +57,7 @@ static DYNLIB try_load_variants_internal(const char *base) {
 plugin_handler_t load_plugin(const char *basename) {
     plugin_handler_t h = {.lib = NULL};
     if (!basename) {
-        maru_log(MARU_LOG_ERROR, "load_plugin: basename is NULL");
+        MR_LOG(ERROR, "load_plugin: basename is NULL");
         return h;
     }
 
@@ -68,7 +68,7 @@ plugin_handler_t load_plugin(const char *basename) {
 #else
     DYNLIB lib = try_load_variants_internal(basename);
     if (!lib) {
-        maru_log(MARU_LOG_ERROR, "load_plugin: failed to load plugin '%s'", basename);
+        MR_LOG(ERROR, "load_plugin: failed to load plugin '%s'", basename);
         return h;
     }
     h.lib = lib;

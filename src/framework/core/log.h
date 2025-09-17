@@ -22,6 +22,8 @@ void maru_log(maru_log_level level, const char *fmt, ...);
 #define DEBUG_ENABLED 0
 #endif
 
+#define MR_LOG(type, ...) maru_log(MARU_LOG_##type, __VA_ARGS__)
+
 #define INFO(...)  maru_log(MARU_LOG_INFO, __VA_ARGS__)
 #define ERROR(...) maru_log(MARU_LOG_ERROR, __VA_ARGS__)
 #define FATAL(...) maru_log(MARU_LOG_FATAL, __VA_ARGS__)

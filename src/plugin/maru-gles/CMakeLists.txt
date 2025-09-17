@@ -10,7 +10,7 @@ target_include_directories(maru-gles
         ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(maru-gles PRIVATE maru)
+target_link_libraries(maru-gles PRIVATE maru glad opengl32)
 
 install(TARGETS maru-gles RUNTIME DESTINATION ${MARU_INSTALL_BIN_DIR}
                          LIBRARY DESTINATION ${MARU_INSTALL_BIN_DIR})
