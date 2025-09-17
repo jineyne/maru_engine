@@ -1,7 +1,7 @@
 {
   "includes": ["graphics.json", "audio.json"],
   "graphics": {
-    "backend": "gl"
+    "backend": "dx11"
   },
   "audio": {
     "backend": "al"

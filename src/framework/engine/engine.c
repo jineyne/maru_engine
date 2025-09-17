@@ -91,7 +91,10 @@ int maru_engine_init(const char *config_path) {
 
     const char *want = map_backend_to_regname(cfg.graphics_backend);
 
-    int win_w = 1024, win_h = 768, win_vsync = 1;
+    int win_w = (cfg.gfx_width > 0) ? cfg.gfx_width : 1280;
+    int win_h = (cfg.gfx_height > 0) ? cfg.gfx_height : 720;
+    int win_vsync = (cfg.gfx_vsync != 0);
+
     g_ctx.window = platform_window_create(NULL, win_w, win_h, win_vsync);
     if (!g_ctx.window) {
         ERROR("Failed to create platform window");
@@ -122,6 +125,8 @@ int maru_engine_init(const char *config_path) {
     g_back_rt = g_ctx.active_rhi->get_backbuffer_rt(g_ctx.active_device);
 
     create_triangle_resources();
+
+    config_free(&cfg);
 
     initialized = 1;
     return MARU_OK;

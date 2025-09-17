@@ -3,10 +3,10 @@
 #include "log.h"
 
 int maru_plugin_init(void) {
-    INFO("maru-al init (OpenAL)");
+    INFO("maru-dx11 init (Direct3D 11)");
     return 0;
 }
 
 void maru_plugin_shutdown(void) {
-    INFO("maru-al shutdown");
+    INFO("maru-dx11 shutdown");
 }
