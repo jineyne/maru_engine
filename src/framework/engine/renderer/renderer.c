@@ -76,6 +76,11 @@ static void destroy_post(renderer_t *R) {
         r->destroy_shader(R->dev, R->post_sh);
         R->post_sh = NULL;
     }
+
+    if (R->post_sampler) {
+        r->destroy_sampler(R->dev, R->post_sampler);
+        R->post_sampler = NULL;
+    }
 }
 
 static void create_post(renderer_t *R) {
@@ -96,6 +101,16 @@ static void create_post(renderer_t *R) {
     pd.depthst.depth_write_enable = 0;
     pd.blend.enable = false;
     R->post_pl = r->create_pipeline(R->dev, &pd);
+
+    rhi_sampler_desc_t samp_desc = {0};
+    samp_desc.min_filter = RHI_FILTER_LINEAR;
+    samp_desc.mag_filter = RHI_FILTER_LINEAR;
+    samp_desc.wrap_u = RHI_WRAP_CLAMP;
+    samp_desc.wrap_v = RHI_WRAP_CLAMP;
+    samp_desc.wrap_w = RHI_WRAP_CLAMP;
+    samp_desc.anisotropy = 1;
+    samp_desc.mip_bias = 0.0f;
+    R->post_sampler = r->create_sampler(R->dev, &samp_desc);
 }
 
 int renderer_init(renderer_t *R, const rhi_dispatch_t *rhi, rhi_device_t *dev, int w, int h) {
@@ -151,6 +166,8 @@ void renderer_render(renderer_t *R) {
     rhi_binding_t b0[2] = {0};
     b0[0].binding = 0; b0[0].texture = R->off_color;
     r->cmd_bind_set(cmd, &b0[0], 1, RHI_STAGE_PS);
+
+    r->cmd_bind_sampler(cmd, 0, R->post_sampler, RHI_STAGE_PS);
 
     r->cmd_draw(cmd, 3, 0, 1);
     r->cmd_end_render(cmd);

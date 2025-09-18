@@ -215,6 +215,14 @@ static void dx11_unbind_all_srvs(dx11_state_t *st) {
     ID3D11DeviceContext_VSSetShaderResources(st->ctx, 0, 128, nulls);
 }
 
+static void dx11_unbind_all_samplers(dx11_state_t *st) {
+    if (!st || !st->ctx) return;
+
+    ID3D11SamplerState *nulls[D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT] = {0};
+    ID3D11DeviceContext_PSSetSamplers(st->ctx, 0, 16, nulls);
+    ID3D11DeviceContext_VSSetSamplers(st->ctx, 0, 16, nulls);
+}
+
 static int dx11_srv_conflicts_with_rt(ID3D11ShaderResourceView *srv, dx11_rt_t *rt) {
     if (!srv || !rt) return 0;
 
@@ -987,10 +995,14 @@ static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const f
     }
 
     dx11_unbind_all_srvs(st);
+    dx11_unbind_all_samplers(st);
 }
 
 static void dx11_cmd_end_render(rhi_cmd_t *c) {
-    UNUSED(c);
+    if (!c || !c->st) return;
+
+    dx11_unbind_all_srvs(c->st);
+    dx11_unbind_all_samplers(c->st);
 }
 
 static void dx11_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {

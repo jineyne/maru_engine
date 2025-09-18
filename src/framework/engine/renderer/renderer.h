@@ -23,6 +23,7 @@ typedef struct renderer {
     /* Post */
     rhi_shader_t *post_sh;
     rhi_pipeline_t *post_pl;
+    rhi_sampler_t *post_sampler;
 
     /* Scene callback */
     render_scene_fn scene_cb;

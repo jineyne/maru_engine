@@ -16,7 +16,7 @@ static inline void zremap_gl_to_dx(mat4_t r) {
     r[3][2] = 0.5f;
 }
 
-static inline void mat4_to_backend_order(const rhi_capabilities_t *caps, const mat4_t in, mat4_t out) {
+static inline void mat4_to_backend_order(const rhi_capabilities_t *caps, mat4_t in, mat4_t out) {
     if (caps && caps->conventions.matrix_order == RHI_MATRIX_ROW_MAJOR) {
         mat4_transpose_to(in, out);
     } else {
@@ -50,7 +50,7 @@ static inline void ortho_from_caps(const rhi_capabilities_t *caps, float left, f
     mat4_to_backend_order(caps, O, out);
 }
 
-static inline void look_at(const vec3_t eye, const vec3_t center, const vec3_t up, mat4_t out) {
+static inline void look_at(vec3_t eye, vec3_t center, vec3_t up, mat4_t out) {
     glm_lookat_rh(eye, center, up, out);
 }
 
