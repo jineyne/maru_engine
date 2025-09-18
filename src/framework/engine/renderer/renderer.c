@@ -2,10 +2,15 @@
 #include <string.h>
 
 static const char *s_post_vs =
-    "float2 POS[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};"
-    "float2 UV [3]={float2( 0, 0),float2(2, 0),float2( 0,2)};"
-    "struct VSOut{float4 pos:SV_Position;float2 uv:TEXCOORD0;};"
-    "VSOut main(uint vid:SV_VertexID){VSOut o;o.pos=float4(POS[vid],0,1);o.uv=UV[vid];return o;}";
+"struct VSOut{float4 pos:SV_Position;float2 uv:TEXCOORD0;};"
+"VSOut main(uint vid : SV_VertexID){"
+"  VSOut o;"
+"  float2 pos = (vid == 0) ? float2(-1,-1) : (vid == 1) ? float2( 3,-1) : float2(-1, 3);"
+"  float2 uv  = (vid == 0) ? float2( 0, 0) : (vid == 1) ? float2( 2, 0) : float2( 0, 2);"
+"  o.pos = float4(pos,0,1);"
+"  o.uv = float2(uv.x, 1.0 - uv.y);"
+"  return o;"
+"}";
 
 static const char *s_post_ps =
     "Texture2D gTex:register(t0);SamplerState gSamp:register(s0);"
@@ -133,7 +138,9 @@ void renderer_render(renderer_t *R) {
     /* Pass 1: Offscreen scene */
     const float clear1[4] = {0.1f, 0.1f, 0.1f, 1.0f};
     r->cmd_begin_render(cmd, R->off_rt, clear1);
-    if (R->scene_cb) R->scene_cb(cmd, R->scene_user);
+    if (R->scene_cb) {
+        R->scene_cb(cmd, R->scene_user);
+    }
     r->cmd_end_render(cmd);
 
     /* Pass 2: Post to backbuffer */
@@ -141,10 +148,9 @@ void renderer_render(renderer_t *R) {
     r->cmd_begin_render(cmd, back, NULL);
     r->cmd_bind_pipeline(cmd, R->post_pl);
 
-    rhi_binding_t b0 = {0};
-    b0.binding = 0;
-    b0.texture = R->off_color;
-    r->cmd_bind_set(cmd, &b0, 1, RHI_STAGE_PS);
+    rhi_binding_t b0[2] = {0};
+    b0[0].binding = 0; b0[0].texture = R->off_color;
+    r->cmd_bind_set(cmd, &b0[0], 1, RHI_STAGE_PS);
 
     r->cmd_draw(cmd, 3, 0, 1);
     r->cmd_end_render(cmd);
