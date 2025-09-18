@@ -1,9 +1,11 @@
 #include "engine.h"
 
+#include "engine_context.h"
+
 #include "config.h"
 #include "plugin/plugin.h"
 #include "rhi/rhi.h"
-#include "engine_context.h"
+#include "renderer/renderer.h"
 
 #include <string.h>
 
@@ -15,6 +17,9 @@
 engine_context_t g_ctx;
 
 static int initialized = 0;
+
+static renderer_t g_renderer;
+
 static rhi_swapchain_t *g_swapchain = NULL;
 static rhi_render_target_t *g_back_rt = NULL;
 
@@ -52,6 +57,16 @@ static void update_mvp_from_size(int w, int h) {
     mat4_mul(PV, R, MVP);
 
     rhi->update_buffer(g_ctx.active_device, g_mvp_cb, &MVP, sizeof(MVP));
+}
+
+
+static void record_scene(rhi_cmd_t* cmd, void* user) {
+    const rhi_dispatch_t* rhi = g_ctx.active_rhi;
+    rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
+    rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
+    rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
+    rhi->cmd_set_index_buffer(cmd, g_triangle_ib);
+    rhi->cmd_draw_indexed(cmd, 3, 0, 0, 1);
 }
 
 static const char *s_vs_hlsl =
@@ -210,6 +225,10 @@ int maru_engine_init(const char *config_path) {
 
     create_triangle_resources();
 
+    int cw = 0, ch = 0; platform_window_get_size(g_ctx.window, &cw, &ch);
+    renderer_init(&g_renderer, g_ctx.active_rhi, g_ctx.active_device, cw, ch);
+    renderer_set_scene(&g_renderer, record_scene, NULL);
+
     config_free(&cfg);
 
     initialized = 1;
@@ -237,19 +256,9 @@ bool maru_engine_tick(void) {
     update_mvp_from_size(cur_w, cur_h);
 
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
-    rhi_cmd_t *cmd = rhi->begin_cmd(g_ctx.active_device);
 
-    const float clear[4] = {0.2f, 0.2f, 0.6f, 1.0f};
-    rhi->cmd_begin_render(cmd, g_back_rt, clear);
-
-    rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
-    rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
-    rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
-    rhi->cmd_set_index_buffer(cmd, g_triangle_ib);
-    rhi->cmd_draw_indexed(cmd, 3, 0, 0, 1);
-
-    rhi->cmd_end_render(cmd);
-    rhi->end_cmd(cmd);
+    renderer_resize(&g_renderer, cur_w, cur_h);
+    renderer_render(&g_renderer);
 
     if (!g_swapchain) g_swapchain = rhi->get_swapchain(g_ctx.active_device);
     rhi->present(g_swapchain);
@@ -258,6 +267,8 @@ bool maru_engine_tick(void) {
 
 void maru_engine_shutdown(void) {
     if (!initialized) return;
+
+    renderer_shutdown(&g_renderer);
 
     engine_context_shutdown(&g_ctx);
 
