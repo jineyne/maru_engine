@@ -1,3 +1,6 @@
+set(ENGINE_ASSET_SRC
+    "engine/asset/asset.c")
+
 set(ENGINE_RHI_SRC
     "engine/rhi/rhi.c")
 
@@ -9,6 +12,7 @@ set(ENGINE_NOFILTER_SRC
     "engine/config.c")
 
 set(ENGINE_SOURCES
+    ${ENGINE_ASSET_SRC}
     ${ENGINE_RHI_SRC}
     ${ENGINE_NOFILTER_SRC}
 )

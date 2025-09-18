@@ -7,6 +7,7 @@
 
 #include <string.h>
 
+#include "asset/asset.h"
 #include "math/math.h"
 #include "math/proj.h"
 #include "platform/window.h"
@@ -120,6 +121,8 @@ int maru_engine_init(const char *config_path) {
     }
 
     INFO("maru init");
+
+    asset_init(NULL);
 
     maru_config_t cfg = {0};
     if (config_load(config_path, &cfg) != MARU_OK) {
