@@ -6,6 +6,7 @@ set(CORE_MISC_SRCS
     "core/misc/cjson.c")
 
 set(CORE_PLATFORM_SRCS
+    "core/platform/path.c"
     "core/platform/window_desktop.c")
 
 set(CORE_PLUGIN_SRCS
