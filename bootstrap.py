@@ -38,12 +38,17 @@ PACKAGES = [
         "name": "glfw",
         "version": "3.4",  # pin; update here to upgrade
         "url": "https://github.com/glfw/glfw/archive/refs/tags/{ver}.tar.gz",
-        # target directory (extracted)
         "dst_dir": SRC_TP / "glfw",
-        # filename under cache
         "filename": "glfw-{ver}.tar.gz",
-        # inner top directory name pattern in the archive (GitHub adds "<repo>-<tag>")
         "inner_top": "glfw-{ver}",
+    },
+    {
+        "name": "cglm",
+        "version": "0.9.2",
+        "url": "https://github.com/recp/cglm/archive/refs/tags/v{ver}.tar.gz",
+        "dst_dir": SRC_TP / "cglm",
+        "filename": "cglm-{ver}.tar.gz",
+        "inner_top": "cglm-{ver}",
     },
     # 추가 패키지는 여기에 같은 형식으로 append
 ]
