@@ -14,8 +14,6 @@ typedef struct dx11_state {
     HWND hwnd;
     int w, h, vsync;
 
-    ID3D11SamplerState *sampler_linear;
-
     IDXGISwapChain *sc;
     ID3D11Device *dev;
     ID3D11DeviceContext *ctx;
@@ -53,6 +51,10 @@ typedef struct {
 
 struct rhi_texture {
     dx11_tex_t t;
+};
+
+struct rhi_sampler {
+    ID3D11SamplerState *state;
 };
 
 typedef struct {
@@ -298,6 +300,27 @@ static D3D11_COMPARISON_FUNC map_cmp(rhi_cmp_func c) {
     return D3D11_COMPARISON_LESS_EQUAL;
 }
 
+static D3D11_TEXTURE_ADDRESS_MODE map_wrap(rhi_wrap w) {
+    switch (w) {
+    case RHI_WRAP_CLAMP: return D3D11_TEXTURE_ADDRESS_CLAMP;
+    case RHI_WRAP_REPEAT: return D3D11_TEXTURE_ADDRESS_WRAP;
+    case RHI_WRAP_MIRROR: return D3D11_TEXTURE_ADDRESS_MIRROR;
+    }
+    return D3D11_TEXTURE_ADDRESS_CLAMP;
+}
+
+static D3D11_FILTER map_filter(rhi_filter minf, rhi_filter magf, int aniso) {
+    if (minf == RHI_FILTER_ANISOTROPIC || magf == RHI_FILTER_ANISOTROPIC || (aniso && aniso > 1)) {
+        return D3D11_FILTER_ANISOTROPIC;
+    }
+
+    if (minf == RHI_FILTER_POINT && magf == RHI_FILTER_POINT) {
+        return D3D11_FILTER_MIN_MAG_MIP_POINT;
+    }
+
+    return D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+}
+
 #pragma endregion helpers
 
 static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
@@ -350,19 +373,6 @@ static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
 
     dx11_refresh_backbuffer_rt(st);
 
-    {
-        D3D11_SAMPLER_DESC sd;
-        memset(&sd, 0, sizeof(sd));
-        sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-        HRESULT hrS = ID3D11Device_CreateSamplerState(st->dev, &sd, &st->sampler_linear);
-        if (FAILED(hrS)) {
-            dx11_release_all(st);
-            free(st);
-            return NULL;
-        }
-    }
-
     rhi_device_t *dev = (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
     if (!dev) {
         dx11_release_all(st);
@@ -378,11 +388,6 @@ static void dx11_destroy_device(rhi_device_t *d) {
     if (!d) return;
 
     dx11_state_t *st = d->st;
-    if (st->sampler_linear) {
-        ID3D11SamplerState_Release(st->sampler_linear);
-        st->sampler_linear = NULL;
-    }
-
     dx11_release_all(st);
     free(st);
 
@@ -647,6 +652,42 @@ static void dx11_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
     }
 
     free(t);
+}
+
+static rhi_sampler_t *dx11_create_sampler(rhi_device_t *d, const rhi_sampler_desc_t *desc) {
+    if (!d || !d->st || !desc) return NULL;
+
+    D3D11_SAMPLER_DESC sd;
+    memset(&sd, 0, sizeof(sd));
+
+    int aniso = desc->anisotropy > 1 ? desc->anisotropy : 1;
+    sd.Filter = map_filter(desc->min_filter, desc->mag_filter, aniso);
+    sd.MaxAnisotropy = (sd.Filter == D3D11_FILTER_ANISOTROPIC) ? aniso : 1;
+
+    sd.AddressU = map_wrap(desc->wrap_u);
+    sd.AddressV = map_wrap(desc->wrap_v);
+    sd.AddressW = map_wrap(desc->wrap_w);
+
+    sd.MipLODBias = desc->mip_bias;
+    sd.MinLOD = 0.0f;
+    sd.MaxLOD = D3D11_FLOAT32_MAX;
+    sd.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+
+    ID3D11SamplerState *state = NULL;
+    HRESULT hr = ID3D11Device_CreateSamplerState(d->st->dev, &sd, &state);
+    if (FAILED(hr)) return NULL;
+
+    rhi_sampler_t *s = (rhi_sampler_t*) calloc(1, sizeof(rhi_sampler_t));
+    s->state = state;
+    return s;
+}
+
+static void dx11_destroy_sampler(rhi_device_t *d, rhi_sampler_t *s) {
+    UNUSED(d);
+    if (!s) return;
+    if (s->state)
+        ID3D11SamplerState_Release(s->state);
+    free(s);
 }
 
 static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
@@ -986,10 +1027,6 @@ static void dx11_cmd_bind_set(rhi_cmd_t *c, const rhi_binding_t *binds, int num,
             ID3D11DeviceContext_VSSetShaderResources(st->ctx, b->binding, 1, &srv);
         }
     }
-
-    if ((stages & RHI_STAGE_PS) && st->sampler_linear) {
-        ID3D11DeviceContext_PSSetSamplers(st->ctx, 0, 1, &st->sampler_linear);
-    }
 }
 
 static void dx11_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, uint32_t stages) {
@@ -999,6 +1036,23 @@ static void dx11_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, 
     }
     if (stages & RHI_STAGE_PS) {
         ID3D11DeviceContext_PSSetConstantBuffers(c->st->ctx, (UINT)slot, 1, &b->vb.buf);
+    }
+}
+
+static void dx11_cmd_bind_sampler(rhi_cmd_t *c, int slot, rhi_sampler_t *s, uint32_t stages) {
+    if (!c || !c->st) return;
+
+    ID3D11SamplerState *stv = s ? s->state : NULL;
+    if (stv == NULL) {
+        MR_LOG(ERROR, "try to bind sampler state but null!");
+        return;
+    }
+
+    if (stages & RHI_STAGE_PS) {
+        ID3D11DeviceContext_PSSetSamplers(c->st->ctx, (UINT)slot, 1, &stv);
+    }
+    if (stages & RHI_STAGE_VS) {
+        ID3D11DeviceContext_VSSetSamplers(c->st->ctx, (UINT)slot, 1, &stv);
     }
 }
 
@@ -1092,6 +1146,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         /* resources */
         dx11_create_buffer, dx11_destroy_buffer, dx11_update_buffer,
         dx11_create_texture, dx11_destroy_texture,
+        dx11_create_sampler, dx11_destroy_sampler,
         dx11_create_shader, dx11_destroy_shader,
         dx11_create_pipeline, dx11_destroy_pipeline,
 
@@ -1101,6 +1156,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         /* commands */
         dx11_begin_cmd, dx11_end_cmd, dx11_cmd_begin_render, dx11_cmd_end_render,
         dx11_cmd_bind_pipeline, dx11_cmd_bind_set, dx11_cmd_bind_const_buffer,
+        dx11_cmd_bind_sampler,
         dx11_cmd_set_viewport_scissor, dx11_cmd_set_blend_color, dx11_cmd_set_depth_bias,
         dx11_cmd_set_vertex_buffer, dx11_cmd_set_index_buffer,
         dx11_cmd_draw, dx11_cmd_draw_indexed,

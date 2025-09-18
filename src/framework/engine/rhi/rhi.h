@@ -33,6 +33,7 @@ typedef struct rhi_device rhi_device_t;
 typedef struct rhi_swapchain rhi_swapchain_t;
 typedef struct rhi_buffer rhi_buffer_t;
 typedef struct rhi_texture rhi_texture_t;
+typedef struct rhi_sampler rhi_sampler_t;
 typedef struct rhi_shader rhi_shader_t;
 typedef struct rhi_pipeline rhi_pipeline_t;
 typedef struct rhi_render_target rhi_render_target_t;
@@ -77,6 +78,16 @@ typedef enum rhi_tex_usage_bits {
     RHI_TEX_USAGE_DEPTH = 1 << 2,
     RHI_TEX_USAGE_GEN_MIPS = 1 << 3,
 } rhi_tex_usage_bits;
+
+typedef enum rhi_filter {
+    RHI_FILTER_POINT,
+    RHI_FILTER_LINEAR,
+    RHI_FILTER_ANISOTROPIC
+} rhi_filter;
+
+typedef enum rhi_wrap {
+    RHI_WRAP_CLAMP, RHI_WRAP_REPEAT, RHI_WRAP_MIRROR
+} rhi_wrap;
 
 typedef enum rhi_blend_factor {
     RHI_BLEND_ZERO,
@@ -139,6 +150,14 @@ typedef struct rhi_texture_desc {
     rhi_format format;
     uint32_t usage; /* render target, sampled, etc. */
 } rhi_texture_desc_t;
+
+typedef struct {
+    rhi_filter min_filter;
+    rhi_filter mag_filter;
+    int anisotropy;
+    rhi_wrap wrap_u, wrap_v, wrap_w;
+    float mip_bias;
+} rhi_sampler_desc_t;
 
 typedef struct rhi_shader_desc {
     const char *entry_vs;
@@ -232,6 +251,9 @@ typedef struct rhi_dispatch {
     rhi_texture_t * (*create_texture)(rhi_device_t *, const rhi_texture_desc_t *, const void *initial);
     void (*destroy_texture)(rhi_device_t *, rhi_texture_t *);
 
+    rhi_sampler_t *(*create_sampler)(rhi_device_t *, const rhi_sampler_desc_t *);
+    void (*destroy_sampler)(rhi_device_t *, rhi_sampler_t *);
+
     rhi_shader_t * (*create_shader)(rhi_device_t *, const rhi_shader_desc_t *);
     void (*destroy_shader)(rhi_device_t *, rhi_shader_t *);
 
@@ -253,6 +275,8 @@ typedef struct rhi_dispatch {
     void (*cmd_bind_pipeline)(rhi_cmd_t *, rhi_pipeline_t *);
     void (*cmd_bind_set)(rhi_cmd_t *, const rhi_binding_t *binds, int num, uint32_t stages_mask);
     void (*cmd_bind_const_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *, uint32_t stages_mask);
+
+    void (*cmd_bind_sampler)(rhi_cmd_t *, int slot, rhi_sampler_t *, uint32_t stages);
 
     void (*cmd_set_viewport_scissor)(rhi_cmd_t *, int x, int y, int w, int h);
     void (*cmd_set_blend_color)(rhi_cmd_t *, float r, float g, float b, float a);

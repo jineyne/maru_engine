@@ -22,6 +22,10 @@ struct rhi_texture {
     uint32_t usage;
 };
 
+struct rhi_sampler {
+    int _dummy;
+};
+
 struct rhi_shader {
     int linked;
 };
@@ -179,6 +183,22 @@ static void gles_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
     free(t);
 }
 
+static rhi_sampler_t *gles_create_sampler(rhi_device_t *d, const rhi_sampler_desc_t *desc) {
+    UNUSED(d);
+    UNUSED(desc);
+    rhi_sampler_t *s = (rhi_sampler_t *)calloc(1, sizeof(rhi_sampler_t));
+    if (!s) return NULL;
+    s->_dummy = 1;
+    return s;
+}
+
+static void gles_destroy_sampler(rhi_device_t *d, rhi_sampler_t *s) {
+    UNUSED(d);
+    if (!s) return;
+    free(s);
+}
+
+
 static rhi_shader_t *gles_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
     UNUSED(d);
     UNUSED(sd);
@@ -321,6 +341,14 @@ static void gles_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, 
     UNUSED(stages_mask);
 }
 
+static void gles_cmd_bind_sampler(rhi_cmd_t *c, int slot, rhi_sampler_t *s, uint32_t stages) {
+    UNUSED(c);
+    UNUSED(slot);
+    UNUSED(s);
+    UNUSED(stages);
+}
+
+
 static void gles_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int h) {
     UNUSED(c);
     UNUSED(x);
@@ -384,6 +412,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         /* resources */
         gles_create_buffer, gles_destroy_buffer, gles_update_buffer,
         gles_create_texture, gles_destroy_texture,
+        gles_create_sampler, gles_destroy_sampler,
         gles_create_shader, gles_destroy_shader,
         gles_create_pipeline, gles_destroy_pipeline,
         gles_create_render_target, gles_destroy_render_target,
@@ -391,6 +420,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         /* commands */
         gles_begin_cmd, gles_end_cmd, gles_cmd_begin_render, gles_cmd_end_render,
         gles_cmd_bind_pipeline, gles_cmd_bind_set, gles_cmd_bind_const_buffer,
+        gles_cmd_bind_sampler,
         gles_cmd_set_viewport_scissor, gl_cmd_set_blend_color, gl_cmd_set_depth_bias, gles_cmd_set_vertex_buffer, gles_cmd_set_index_buffer,
         gles_cmd_draw, gles_cmd_draw_indexed,
         /* sync */
