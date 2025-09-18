@@ -1,7 +1,7 @@
 #ifndef MARU_PROJ_H
 #define MARU_PROJ_H
 
-#include "rhi/rhi.h"      /* rhi_capabilities_t */
+#include "rhi/rhi.h"
 #include "math.h"
 #include <math.h>
 
@@ -13,7 +13,7 @@ static inline void zremap_gl_to_dx(mat4_t r) {
     glm_mat4_identity(r);
 
     r[2][2] = 0.5f;
-    r[3][2] = 0.5f; 
+    r[3][2] = 0.5f;
 }
 
 static inline void mat4_to_backend_order(const rhi_capabilities_t *caps, const mat4_t in, mat4_t out) {

@@ -120,35 +120,119 @@ def download(url: str, dst: Path):
     except URLError as e:
         raise RuntimeError(f"URL error while fetching {url}: {e.reason}") from e
 
-def extract_archive(archive: Path, dst_dir: Path, inner_top: str | None):
-    if dst_dir.exists():
-        shutil.rmtree(dst_dir)
-    dst_dir.parent.mkdir(parents=True, exist_ok=True)
+def is_effectively_empty(path: Path) -> bool:
+    if not path.exists():
+        return True
+    try:
+        entries = [p for p in path.iterdir()]
+    except FileNotFoundError:
+        return True
+    return len(entries) == 1 and entries[0].name == ".gitignore"
 
-    if archive.suffixes[-2:] == [".tar", ".gz"] or archive.suffix == ".tgz":
-        with tarfile.open(archive, "r:gz") as tf:
-            tf.extractall(dst_dir.parent)
-    elif archive.suffix == ".zip":
+def _make_tree_writable(path: Path) -> None:
+    if not path.exists():
+        return
+    for p in path.rglob("*"):
+        try:
+            m = p.stat().st_mode
+            p.chmod(m | stat.S_IWRITE)
+        except Exception:
+            pass
+    try:
+        m = path.stat().st_mode
+        path.chmod(m | stat.S_IWRITE)
+    except Exception:
+        pass
+
+def _safe_join(base: Path, *paths: str) -> Path:
+    candidate = (base / Path(*paths)).resolve()
+    base_resolved = base.resolve()
+    if str(candidate).startswith(str(base_resolved)):
+        return candidate
+    raise RuntimeError(f"Blocked path traversal: {candidate}")
+
+def _guess_topdir_from_members(members: list[str]) -> str | None:
+    tops = set()
+    for name in members:
+        name = name.replace("\\", "/")
+        if name.startswith("/") or name.startswith("../") or "/../" in name:
+            return None
+        first = name.split("/", 1)[0]
+        if first:
+            tops.add(first)
+        if len(tops) > 1:
+            return None
+    return next(iter(tops)) if tops else None
+
+def extract_archive(archive: Path, dst_dir: Path, inner_top: str | None):
+    if is_effectively_empty(dst_dir):
+        if dst_dir.exists():
+            _make_tree_writable(dst_dir)
+            shutil.rmtree(dst_dir, ignore_errors=True)
+
+    if dst_dir.exists() and any(dst_dir.iterdir()):
+        print(f"[bootstrap] {dst_dir} already exists (non-empty). Skipping.")
+        return
+
+    dst_dir.parent.mkdir(parents=True, exist_ok=True)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    lower = archive.name.lower()
+    if lower.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
+        with tarfile.open(archive, "r:*") as tf:
+            members = tf.getmembers()
+            names = [m.name for m in members if m.name]
+            top = inner_top or _guess_topdir_from_members(names)
+            for m in members:
+                name = (m.name or "").replace("\\", "/")
+                if top and name.startswith(top + "/"):
+                    rel = name[len(top) + 1 :]
+                elif top and name == top:
+                    rel = ""
+                else:
+                    rel = name
+                target_path = _safe_join(dst_dir, rel) if rel else dst_dir
+                if m.isdir():
+                    target_path.mkdir(parents=True, exist_ok=True)
+                elif m.issym() or m.islnk():
+                    continue
+                else:
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    with tf.extractfile(m) as rf:
+                        if rf is None:
+                            continue
+                        with open(target_path, "wb") as wf:
+                            shutil.copyfileobj(rf, wf)
+    elif lower.endswith(".zip"):
         with zipfile.ZipFile(archive, "r") as zf:
-            zf.extractall(dst_dir.parent)
+            names = zf.namelist()
+            top = inner_top or _guess_topdir_from_members(names)
+            for name in names:
+                norm = name.replace("\\", "/")
+                if norm.endswith("/"):
+                    rel = norm[:-1]
+                else:
+                    rel = norm
+                if top and rel.startswith(top + "/"):
+                    rel = rel[len(top) + 1 :]
+                elif top and rel == top:
+                    rel = ""
+                target_path = _safe_join(dst_dir, rel) if rel else dst_dir
+                if name.endswith("/"):
+                    target_path.mkdir(parents=True, exist_ok=True)
+                else:
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(name, "r") as rf, open(target_path, "wb") as wf:
+                        shutil.copyfileobj(rf, wf)
     else:
         raise RuntimeError(f"Unsupported archive type: {archive.name}")
 
-    # Move/normalize to dst_dir
-    if inner_top:
-        inner = dst_dir.parent / inner_top
-        if inner.exists():
-            if dst_dir.exists():
-                shutil.rmtree(dst_dir)
-            inner.rename(dst_dir)
-        else:
-            # If the expected inner dir name doesn't exist, try to detect the single top folder
-            candidates = [p for p in dst_dir.parent.iterdir() if p.is_dir() and p.name.startswith(dst_dir.name)]
-            if len(candidates) == 1:
-                candidates[0].rename(dst_dir)
-            else:
-                raise RuntimeError(f"Could not find extracted top directory for {archive.name}")
-    dst_dir.mkdir(parents=True, exist_ok=True)
+    gi = dst_dir / ".gitignore"
+    if not gi.exists():
+        try:
+            gi.write_text("*\n", encoding="utf-8")
+        except Exception:
+            pass
 
 def clean(paths: list[Path]):
     for p in paths:
