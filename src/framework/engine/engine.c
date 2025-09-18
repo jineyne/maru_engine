@@ -19,6 +19,7 @@ static rhi_swapchain_t *g_swapchain = NULL;
 static rhi_render_target_t *g_back_rt = NULL;
 
 static rhi_buffer_t *g_triangle_vb = NULL;
+static rhi_buffer_t *g_triangle_ib = NULL;
 static rhi_shader_t *g_triangle_sh = NULL;
 static rhi_pipeline_t *g_triangle_pl = NULL;
 
@@ -75,6 +76,12 @@ static void create_triangle_resources(void) {
     bd.size = sizeof(vtx);
     bd.usage = RHI_BUF_VERTEX;
     g_triangle_vb = rhi->create_buffer(g_ctx.active_device, &bd, vtx);
+
+    uint32_t idx[] = {0, 1, 2};
+    rhi_buffer_desc_t ibd = {0};
+    ibd.size = sizeof(idx);
+    ibd.usage = RHI_BUF_INDEX;
+    g_triangle_ib = rhi->create_buffer(g_ctx.active_device, &ibd, idx);
 
     rhi_shader_desc_t sd = {0};
     sd.entry_vs = "main";
@@ -238,7 +245,8 @@ bool maru_engine_tick(void) {
     rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
     rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
     rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
-    rhi->cmd_draw(cmd, 3, 0, 1);
+    rhi->cmd_set_index_buffer(cmd, g_triangle_ib);
+    rhi->cmd_draw_indexed(cmd, 3, 0, 0, 1);
 
     rhi->cmd_end_render(cmd);
     rhi->end_cmd(cmd);

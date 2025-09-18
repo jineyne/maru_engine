@@ -988,8 +988,7 @@ static void dx11_cmd_set_vertex_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b) 
 }
 
 static void dx11_cmd_set_index_buffer(rhi_cmd_t *c, rhi_buffer_t *b) {
-    UNUSED(c);
-    UNUSED(b);
+    ID3D11DeviceContext_IASetIndexBuffer(c->st->ctx, b->vb.buf, DXGI_FORMAT_R32_UINT, 0);
 }
 
 static void dx11_cmd_draw(rhi_cmd_t *c, uint32_t vtx_count, uint32_t first, uint32_t inst) {
@@ -998,11 +997,13 @@ static void dx11_cmd_draw(rhi_cmd_t *c, uint32_t vtx_count, uint32_t first, uint
 }
 
 static void dx11_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t first, uint32_t base_vtx, uint32_t inst) {
-    UNUSED(c);
-    UNUSED(idx_count);
-    UNUSED(first);
-    UNUSED(base_vtx);
-    UNUSED(inst);
+    if (!c || !c->st || !c->st->ctx || idx_count == 0) return;
+
+    if (inst <= 1) {
+        ID3D11DeviceContext_DrawIndexed(c->st->ctx, (UINT)idx_count, (UINT)first, (INT)base_vtx);
+    } else {
+        ID3D11DeviceContext_DrawIndexedInstanced(c->st->ctx, (UINT)idx_count, (UINT)inst, (UINT)first, (INT)base_vtx, 0);
+    }
 }
 
 static rhi_fence_t *dx11_fence_create(rhi_device_t *d) {
