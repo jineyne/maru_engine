@@ -1,3 +1,7 @@
+set(CORE_FS_SRCS
+    "core/fs/fs.c"
+    "core/fs/path.c")
+
 set(CORE_MATH_SRCS
     "core/math/math.c"
     "core/math/proj.c")
@@ -16,6 +20,7 @@ set(CORE_THREAD_SRCS
     "core/thread/mutex.c")
 
 set(CORE_SOURCES
+    ${CORE_FS_SRCS}
     ${CORE_MATH_SRCS}
     ${CORE_MISC_SRCS}
     ${CORE_PLATFORM_SRCS}
@@ -24,7 +29,6 @@ set(CORE_SOURCES
 
     "core/log.c"
     "core/error.c"
-    "core/fs.c"
     "core/json.c"
     "core/time.c"
 )

@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "fs.h"
+#include "fs/fs.h"
 #include "misc/cjson.h"
 #include "macro.h"
 
