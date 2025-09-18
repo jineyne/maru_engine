@@ -6,7 +6,7 @@
 extern engine_context_t g_ctx;
 
 int main(void) {
-    if (maru_engine_init("../../testbed/config/engine.json") != 0) {
+    if (maru_engine_init("../../config/engine.json") != 0) {
         return 1;
     }
 
