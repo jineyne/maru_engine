@@ -39,6 +39,14 @@ typedef struct rhi_render_target rhi_render_target_t;
 typedef struct rhi_cmd rhi_cmd_t;
 typedef struct rhi_fence rhi_fence_t;
 
+typedef enum rhi_vertex_format {
+    RHI_VTX_F32x1,
+    RHI_VTX_F32x2,
+    RHI_VTX_F32x3,
+    RHI_VTX_F32x4,
+    RHI_VTX_UNORM8x4,
+} rhi_vertex_format;
+
 typedef enum rhi_backend {
     RHI_BACKEND_GL,
     RHI_BACKEND_GLES,
@@ -70,6 +78,49 @@ typedef enum rhi_tex_usage_bits {
     RHI_TEX_USAGE_GEN_MIPS = 1 << 3,
 } rhi_tex_usage_bits;
 
+typedef enum rhi_blend_factor {
+    RHI_BLEND_ZERO,
+    RHI_BLEND_ONE,
+    RHI_BLEND_SRC_ALPHA,
+    RHI_BLEND_INV_SRC_ALPHA,
+    RHI_BLEND_DST_ALPHA,
+    RHI_BLEND_INV_DST_ALPHA,
+    RHI_BLEND_SRC_COLOR,
+    RHI_BLEND_INV_SRC_COLOR,
+    RHI_BLEND_DST_COLOR,
+    RHI_BLEND_INV_DST_COLOR,
+} rhi_blend_factor;
+
+typedef enum rhi_blend_op {
+    RHI_BLEND_ADD,
+    RHI_BLEND_SUB,
+    RHI_BLEND_REV_SUB,
+    RHI_BLEND_MIN,
+    RHI_BLEND_MAX,
+} rhi_blend_op;
+
+typedef enum rhi_fill_mode {
+    RHI_FILL_SOLID,
+    RHI_FILL_WIREFRAME
+} rhi_fill_mode;
+
+typedef enum rhi_cull_mode {
+    RHI_CULL_NONE,
+    RHI_CULL_FRONT,
+    RHI_CULL_BACK
+} rhi_cull_mode;
+
+typedef enum rhi_cmp_func {
+    RHI_CMP_NEVER,
+    RHI_CMP_LESS,
+    RHI_CMP_LEQUAL,
+    RHI_CMP_EQUAL,
+    RHI_CMP_GEQUAL,
+    RHI_CMP_GREATER,
+    RHI_CMP_NOTEQUAL,
+    RHI_CMP_ALWAYS,
+} rhi_cmp_func;
+
 typedef struct rhi_device_desc {
     rhi_backend backend; /* informational */
     void *native_window; /* HWND / EGLSurface / etc */
@@ -98,9 +149,49 @@ typedef struct rhi_shader_desc {
     size_t blob_ps_size;
 } rhi_shader_desc_t;
 
+typedef struct rhi_blend_state {
+    bool enable;
+    rhi_blend_factor src_rgb, dst_rgb;
+    rhi_blend_op op_rgb;
+    rhi_blend_factor src_a, dst_a;
+    rhi_blend_op op_a;
+    uint8_t write_mask;
+} rhi_blend_state_t;
+
+typedef struct rhi_depthstencil_state {
+    int depth_test_enable;
+    int depth_write_enable;
+    rhi_cmp_func depth_func;
+} rhi_depthstencil_state_t;
+
+typedef struct rhi_raster_state {
+    rhi_fill_mode fill;
+    rhi_cull_mode cull;
+    int front_ccw; /* 1 = CCW°¡ front */
+    float depth_bias;
+    float slope_scaled_depth_bias;
+} rhi_raster_state_t;
+
+typedef struct rhi_vertex_attr {
+    const char *semantic;
+    uint32_t location;
+    uint32_t format;
+    uint32_t buffer_slot;
+    uint32_t offset;
+} rhi_vertex_attr_t;
+
+typedef struct rhi_vertex_layout {
+    const rhi_vertex_attr_t *attrs;
+    int attr_count;
+    uint32_t stride[8];
+} rhi_vertex_layout_t;
+
 typedef struct rhi_pipeline_desc {
     rhi_shader_t *shader;
-    //TODO: blend/depth/raster/vertex-layout
+    rhi_vertex_layout_t layout;
+    rhi_blend_state_t blend;
+    rhi_depthstencil_state_t depthst;
+    rhi_raster_state_t raster;
 } rhi_pipeline_desc_t;
 
 typedef struct rhi_rt_attachment_desc {
@@ -164,6 +255,9 @@ typedef struct rhi_dispatch {
     void (*cmd_bind_const_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *, uint32_t stages_mask);
 
     void (*cmd_set_viewport_scissor)(rhi_cmd_t *, int x, int y, int w, int h);
+    void (*cmd_set_blend_color)(rhi_cmd_t *, float r, float g, float b, float a);
+    void (*cmd_set_depth_bias)(rhi_cmd_t *, float constant, float slope_scaled);
+
     void (*cmd_set_vertex_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *);
     void (*cmd_set_index_buffer)(rhi_cmd_t *, rhi_buffer_t *);
     void (*cmd_draw)(rhi_cmd_t *, uint32_t vtx_count, uint32_t first, uint32_t inst_count);

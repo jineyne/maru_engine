@@ -60,12 +60,42 @@ static int gl_srv_conflicts_with_rt(GLuint tex, const rhi_render_target_t *rt) {
     return 0;
 }
 
+static void gl_apply_states(const rhi_pipeline_desc_t *s) {
+    // raster
+    if (s->raster.cull == RHI_CULL_NONE)
+        glDisable(GL_CULL_FACE);
+    else {
+        glEnable(GL_CULL_FACE);
+        glCullFace(s->raster.cull == RHI_CULL_FRONT ? GL_FRONT : GL_BACK);
+    }
+    glFrontFace(s->raster.front_ccw ? GL_CCW : GL_CW);
+
+    // depth
+    if (s->depthst.depth_test_enable) {
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+    } else
+        glDisable(GL_DEPTH_TEST);
+    glDepthMask(s->depthst.depth_write_enable ? GL_TRUE : GL_FALSE);
+
+    // blend
+    if (s->blend.enable) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBlendEquation(GL_FUNC_ADD);
+        glColorMask((s->blend.write_mask & 1) != 0, (s->blend.write_mask & 2) != 0,
+                    (s->blend.write_mask & 4) != 0, (s->blend.write_mask & 8) != 0);
+    } else {
+        glDisable(GL_BLEND);
+    }
+}
+
 #pragma endregion Helpers
 
 static rhi_device_t *gles_create_device(const rhi_device_desc_t *d) {
     INFO("creating OpenGL ES device");
     UNUSED(d);
-    return (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
+    return (rhi_device_t*)calloc(1, sizeof(rhi_device_t));
 }
 
 static void gles_destroy_device(rhi_device_t *d) {
@@ -74,7 +104,7 @@ static void gles_destroy_device(rhi_device_t *d) {
 
 static rhi_swapchain_t *gles_get_swapchain(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_swapchain_t*) calloc(1, sizeof(rhi_swapchain_t));
+    return (rhi_swapchain_t*)calloc(1, sizeof(rhi_swapchain_t));
 }
 
 static void gles_present(rhi_swapchain_t *s) {
@@ -91,7 +121,7 @@ static rhi_buffer_t *gles_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     UNUSED(d);
     UNUSED(desc);
     UNUSED(initial);
-    return (rhi_buffer_t*) calloc(1, sizeof(rhi_buffer_t));
+    return (rhi_buffer_t*)calloc(1, sizeof(rhi_buffer_t));
 }
 
 static void gles_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
@@ -109,7 +139,7 @@ static void gles_update_buffer(rhi_device_t *d, rhi_buffer_t *b, const void *dat
 static rhi_texture_t *gles_create_texture(rhi_device_t *d, const rhi_texture_desc_t *desc, const void *initial) {
     UNUSED(d);
     UNUSED(initial);
-    rhi_texture_t *t = (rhi_texture_t*) calloc(1, sizeof(*t));
+    rhi_texture_t *t = (rhi_texture_t*)calloc(1, sizeof(*t));
     glGenTextures(1, &t->id);
     t->target = GL_TEXTURE_2D;
     t->w = desc->width;
@@ -152,7 +182,7 @@ static void gles_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
 static rhi_shader_t *gles_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
     UNUSED(d);
     UNUSED(sd);
-    return (rhi_shader_t*) calloc(1, sizeof(rhi_shader_t));
+    return (rhi_shader_t*)calloc(1, sizeof(rhi_shader_t));
 }
 
 static void gles_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
@@ -162,7 +192,7 @@ static void gles_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
 
 static rhi_pipeline_t *gles_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     UNUSED(d);
-    rhi_pipeline_t *p = (rhi_pipeline_t*) calloc(1, sizeof(rhi_pipeline_t));
+    rhi_pipeline_t *p = (rhi_pipeline_t*)calloc(1, sizeof(rhi_pipeline_t));
     p->sh = pd->shader;
     return p;
 }
@@ -174,7 +204,7 @@ static void gles_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p) {
 
 static rhi_render_target_t *gles_create_render_target(rhi_device_t *d, const rhi_render_target_desc_t *desc) {
     UNUSED(d);
-    rhi_render_target_t *rt = (rhi_render_target_t*) calloc(1, sizeof(*rt));
+    rhi_render_target_t *rt = (rhi_render_target_t*)calloc(1, sizeof(*rt));
     glGenFramebuffers(1, &rt->fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
 
@@ -187,7 +217,8 @@ static rhi_render_target_t *gles_create_render_target(rhi_device_t *d, const rhi
         }
 
         if (tx) {
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, tx->target, tx->id, desc->color[i].mip_level);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, tx->target, tx->id,
+                                   desc->color[i].mip_level);
         }
     }
 
@@ -226,7 +257,7 @@ static rhi_render_target_t *gles_get_backbuffer_rt(rhi_device_t *d) {
     UNUSED(d);
     static rhi_render_target_t *s = NULL;
     if (!s) {
-        s = (rhi_render_target_t*) calloc(1, sizeof(*s));
+        s = (rhi_render_target_t*)calloc(1, sizeof(*s));
         s->is_backbuffer = 1;
     }
     return s;
@@ -240,7 +271,7 @@ static rhi_texture_t *gles_render_target_get_color_tex(rhi_render_target_t *rt, 
 
 static rhi_cmd_t *gles_begin_cmd(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_cmd_t*) calloc(1, sizeof(rhi_cmd_t));
+    return (rhi_cmd_t*)calloc(1, sizeof(rhi_cmd_t));
 }
 
 static void gles_end_cmd(rhi_cmd_t *c) { free(c); }
@@ -298,6 +329,17 @@ static void gles_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int
     UNUSED(h);
 }
 
+static void gl_cmd_set_blend_color(rhi_cmd_t *c, float r, float g, float b, float a) {
+    UNUSED(c);
+    glBlendColor(r, g, b, a);
+}
+
+static void gl_cmd_set_depth_bias(rhi_cmd_t *c, float constant, float slope_scaled) {
+    UNUSED(c);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(slope_scaled, constant);
+}
+
 static void gles_cmd_set_vertex_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b) {
     UNUSED(c);
     UNUSED(slot);
@@ -326,7 +368,7 @@ static void gles_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t fir
 
 static rhi_fence_t *gles_fence_create(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_fence_t*) calloc(1, sizeof(rhi_fence_t));
+    return (rhi_fence_t*)calloc(1, sizeof(rhi_fence_t));
 }
 
 static void gles_fence_wait(rhi_fence_t *f) { UNUSED(f); }
@@ -349,7 +391,7 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         /* commands */
         gles_begin_cmd, gles_end_cmd, gles_cmd_begin_render, gles_cmd_end_render,
         gles_cmd_bind_pipeline, gles_cmd_bind_set, gles_cmd_bind_const_buffer,
-        gles_cmd_set_viewport_scissor, gles_cmd_set_vertex_buffer, gles_cmd_set_index_buffer,
+        gles_cmd_set_viewport_scissor, gl_cmd_set_blend_color, gl_cmd_set_depth_bias, gles_cmd_set_vertex_buffer, gles_cmd_set_index_buffer,
         gles_cmd_draw, gles_cmd_draw_indexed,
         /* sync */
         gles_fence_create, gles_fence_wait, gles_fence_destroy,

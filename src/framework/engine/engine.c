@@ -35,7 +35,7 @@ static void update_mvp_from_size(int w, int h) {
     rhi->get_capabilities(g_ctx.active_device, &caps);
 
     if (h <= 0) h = 1;
-    float aspect = (float) w / (float) h;
+    float aspect = (float)w / (float)h;
 
     mat4_t P, V, M, R, PV, MVP;
     perspective_from_caps(&caps, 60.0f * (3.14159265f / 180.0f), aspect, 0.1f, 100.0f, P);
@@ -61,7 +61,7 @@ static const char *s_vs_hlsl =
 
 static const char *s_ps_hlsl =
     "struct PSIn{ float4 pos:SV_Position; float3 col:COLOR; };"
-    "float4 main(PSIn i):SV_Target{ return float4(i.col,1); }";
+    "float4 main(PSIn i):SV_Target{ return float4(i.col, 0.3); }";
 
 static void create_triangle_resources(void) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
@@ -73,6 +73,7 @@ static void create_triangle_resources(void) {
     };
     rhi_buffer_desc_t bd = {0};
     bd.size = sizeof(vtx);
+    bd.usage = RHI_BUF_VERTEX;
     g_triangle_vb = rhi->create_buffer(g_ctx.active_device, &bd, vtx);
 
     rhi_shader_desc_t sd = {0};
@@ -85,8 +86,36 @@ static void create_triangle_resources(void) {
     sd.blob_ps_size = strlen(s_ps_hlsl);
     g_triangle_sh = rhi->create_shader(g_ctx.active_device, &sd);
 
-    rhi_pipeline_desc_t pd = {0};
+    rhi_pipeline_desc_t pd = (rhi_pipeline_desc_t){0};
     pd.shader = g_triangle_sh;
+
+    static const rhi_vertex_attr_t attrs[] = {
+        {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
+        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
+    };
+    pd.layout.attrs = attrs;
+    pd.layout.attr_count = 2;
+    pd.layout.stride[0] = (uint32_t)(sizeof(float) * 6);
+
+    pd.raster.fill = RHI_FILL_SOLID;
+    pd.raster.cull = RHI_CULL_BACK;
+    pd.raster.front_ccw = 0;
+    pd.raster.depth_bias = 0.0f;
+    pd.raster.slope_scaled_depth_bias = 0.0f;
+
+    pd.depthst.depth_test_enable = 1;
+    pd.depthst.depth_write_enable = 0;
+    pd.depthst.depth_func = RHI_CMP_LEQUAL;
+
+    pd.blend.enable = true;
+    pd.blend.src_rgb = RHI_BLEND_SRC_ALPHA;
+    pd.blend.dst_rgb = RHI_BLEND_INV_SRC_ALPHA;
+    pd.blend.op_rgb = RHI_BLEND_ADD;
+    pd.blend.src_a = RHI_BLEND_SRC_ALPHA;
+    pd.blend.dst_a = RHI_BLEND_INV_SRC_ALPHA;
+    pd.blend.op_a = RHI_BLEND_ADD;
+    pd.blend.write_mask = 0x0F;
+
     g_triangle_pl = rhi->create_pipeline(g_ctx.active_device, &pd);
 
     mat4_t zero = {0};
