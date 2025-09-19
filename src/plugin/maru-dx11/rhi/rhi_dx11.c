@@ -329,6 +329,29 @@ static D3D11_FILTER map_filter(rhi_filter minf, rhi_filter magf, int aniso) {
     return D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 }
 
+static size_t bytes_per_pixel_dxgi(DXGI_FORMAT fmt) {
+    switch (fmt) {
+    case DXGI_FORMAT_R8G8B8A8_UNORM:
+    case DXGI_FORMAT_B8G8R8A8_UNORM:
+        return 4;
+    case DXGI_FORMAT_D24_UNORM_S8_UINT:
+    case DXGI_FORMAT_R24G8_TYPELESS:
+        return 4;
+    default:
+        return 0;
+    }
+}
+
+static UINT mip_count_from_wh(UINT w, UINT h) {
+    UINT m = 1;
+    while ((w | h) > 1) {
+        w = w > 1 ? (w >> 1) : 1;
+        h = h > 1 ? (h >> 1) : 1;
+        ++m;
+    }
+    return m;
+}
+
 #pragma endregion helpers
 
 static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
@@ -564,7 +587,53 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
     if (wantDSV) td.BindFlags |= D3D11_BIND_DEPTH_STENCIL;
 
     const D3D11_SUBRESOURCE_DATA *init_data = NULL;
-    hr = ID3D11Device_CreateTexture2D(st->dev, &td, NULL, &tex->t.tex);
+    D3D11_SUBRESOURCE_DATA *subs = NULL;
+
+    if (initial) {
+        UINT mip_count = td.MipLevels;
+        /*if (desc->mip_levels == 0 && wantSRV && !wantDSV) {
+            mipCount = mip_count_from_wh(td.Width, td.Height);
+            td.MipLevels = mipCount;
+        }*/
+
+        const size_t bpp = bytes_per_pixel_dxgi(base_fmt);
+        if (bpp == 0) {
+            MR_LOG(ERROR, "Unsupported initial-data format for DXGI format %d", (int)base_fmt);
+            free(tex);
+            return NULL;
+        }
+
+        subs = (D3D11_SUBRESOURCE_DATA*)malloc(sizeof(D3D11_SUBRESOURCE_DATA) * mip_count);
+        if (!subs) {
+            free(tex);
+            return NULL;
+        }
+
+        const uint8_t *src = (const uint8_t*)initial;
+        UINT w = td.Width, h = td.Height;
+        for (UINT i = 0; i < mip_count; ++i) {
+            UINT rw = w ? w : 1;
+            UINT rh = h ? h : 1;
+            UINT rowPitch = (UINT)(rw * bpp);
+            UINT slicePitch = rowPitch * rh;
+
+            subs[i].pSysMem = src;
+            subs[i].SysMemPitch = rowPitch;
+            subs[i].SysMemSlicePitch = slicePitch;
+
+            src += slicePitch;
+            w = (w > 1) ? (w >> 1) : 1;
+            h = (h > 1) ? (h >> 1) : 1;
+        }
+
+        init_data = subs;
+    }
+
+    hr = ID3D11Device_CreateTexture2D(st->dev, &td, init_data, &tex->t.tex);
+    if (subs) {
+        free(subs);
+    }
+
     if (FAILED(hr)) {
         free(tex);
         return NULL;
@@ -1043,6 +1112,7 @@ static void dx11_cmd_bind_texture(rhi_cmd_t *c, rhi_texture_t *t, int slot, uint
     if (stages & RHI_STAGE_PS) {
         ID3D11DeviceContext_PSSetShaderResources(st->ctx, slot, 1, &srv);
     }
+
     if (stages & RHI_STAGE_VS) {
         ID3D11DeviceContext_VSSetShaderResources(st->ctx, slot, 1, &srv);
     }
