@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "asset/asset.h"
+#include "asset/texture.h"
 #include "math/math.h"
 #include "math/proj.h"
 #include "platform/window.h"
@@ -30,6 +31,9 @@ static rhi_pipeline_t *g_triangle_pl = NULL;
 
 static rhi_buffer_t *g_mvp_cb = NULL;
 
+static texture_t *g_texture = NULL;
+static rhi_sampler_t *g_sampler = NULL;
+
 static void update_mvp_from_size(int w, int h) {
     if (!g_ctx.active_rhi || !g_ctx.active_device || !g_mvp_cb) return;
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
@@ -41,7 +45,7 @@ static void update_mvp_from_size(int w, int h) {
     rhi->get_capabilities(g_ctx.active_device, &caps);
 
     if (h <= 0) h = 1;
-    float aspect = (float)w / (float)h;
+    float aspect = (float) w / (float) h;
 
     mat4_t P, V, M, R, PV, MVP;
     perspective_from_caps(&caps, 60.0f * (3.14159265f / 180.0f), aspect, 0.1f, 100.0f, P);
@@ -59,9 +63,15 @@ static void update_mvp_from_size(int w, int h) {
     rhi->update_buffer(g_ctx.active_device, g_mvp_cb, &MVP, sizeof(MVP));
 }
 
+static void record_scene(rhi_cmd_t *cmd, void *user) {
+    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
-static void record_scene(rhi_cmd_t* cmd, void* user) {
-    const rhi_dispatch_t* rhi = g_ctx.active_rhi;
+    rhi_binding_t binds[2] = { 0 };
+    binds[0].binding = 0;  binds[0].texture = g_texture->internal;
+
+    g_ctx.active_rhi->cmd_bind_set(cmd, binds, 1, RHI_STAGE_PS);
+    g_ctx.active_rhi->cmd_bind_sampler(cmd, 0, g_sampler, RHI_STAGE_PS);
+
     rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
     rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
     rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
@@ -71,21 +81,28 @@ static void record_scene(rhi_cmd_t* cmd, void* user) {
 
 static const char *s_vs_hlsl =
     "cbuffer PerFrame : register(b0) { row_major float4x4 uMVP; };"
-    "struct VSIn { float3 pos:POSITION; float3 col:COLOR; };"
-    "struct VSOut{ float4 pos:SV_Position; float3 col:COLOR; };"
-    "VSOut main(VSIn i){ VSOut o; o.pos = mul(float4(i.pos,1), uMVP); o.col=i.col; return o; }";
+    "struct VSIn { float3 pos:POSITION; float3 col:COLOR; float2 uv:TEXCOORD0; };"
+    "struct VSOut{ float4 pos:SV_Position; float3 col:COLOR;  float2 uv:TEXCOORD0; };"
+    "VSOut main(VSIn i){ VSOut o; o.pos = mul(float4(i.pos,1), uMVP); o.col=i.col; o.uv=i.uv; return o; }";
 
 static const char *s_ps_hlsl =
-    "struct PSIn{ float4 pos:SV_Position; float3 col:COLOR; };"
-    "float4 main(PSIn i):SV_Target{ return float4(i.col, 0.3); }";
+    "struct PSIn{ float4 pos:SV_Position; float3 col:COLOR; float2 uv:TEXCOORD0; };"
+    "Texture2D    gAlbedo : register(t0);"
+    "SamplerState gSamp   : register(s0);"
+    "float4 main(PSIn i):SV_Target{"
+    "    float4 tex = gAlbedo.Sample(gSamp, i.uv);"
+    "    return tex;"
+    "}";
+
 
 static void create_triangle_resources(void) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
     float vtx[] = {
-        /* top    */ 0.0f, 0.5f, 0.0f, 1, 0, 0,
-        /* right  */ 0.5f, -0.5f, 0.0f, 0, 0, 1,
-        /* left   */ -0.5f, -0.5f, 0.0f, 0, 1, 0,
+        //          position             color         uv
+        /* top   */  0.0f,  0.5f, 0.0f,  1,0,0,       0.5f, 0.0f,
+        /* right */  0.5f, -0.5f, 0.0f,  0,0,1,       1.0f, 1.0f,
+        /* left  */ -0.5f, -0.5f, 0.0f,  0,1,0,       0.0f, 1.0f,
     };
     rhi_buffer_desc_t bd = {0};
     bd.size = sizeof(vtx);
@@ -113,11 +130,12 @@ static void create_triangle_resources(void) {
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
+        {"COLOR",    0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
     };
     pd.layout.attrs = attrs;
-    pd.layout.attr_count = 2;
-    pd.layout.stride[0] = (uint32_t)(sizeof(float) * 6);
+    pd.layout.attr_count = 3;
+    pd.layout.stride[0] = (uint32_t)(sizeof(float) * 8);
 
     pd.raster.fill = RHI_FILL_SOLID;
     pd.raster.cull = RHI_CULL_BACK;
@@ -150,6 +168,22 @@ static void create_triangle_resources(void) {
     int cw = 0, ch = 0;
     platform_window_get_size(g_ctx.window, &cw, &ch);
     update_mvp_from_size(cw, ch);
+
+    asset_texture_opts_t opts = {
+        .gen_mips = 1,
+        .flip_y = 1,
+        .force_rgba = 1
+    };
+    g_texture = asset_load_texture("texture\\karina.jpg", &opts);
+
+    rhi_sampler_desc_t sampler_desc = { 0 };
+    sampler_desc.min_filter = RHI_FILTER_LINEAR;
+    sampler_desc.mag_filter = RHI_FILTER_LINEAR;
+    sampler_desc.mip_bias = RHI_FILTER_LINEAR;
+    sampler_desc.wrap_u = RHI_WRAP_CLAMP;
+    sampler_desc.wrap_v = RHI_WRAP_CLAMP;
+    sampler_desc.wrap_w = RHI_WRAP_CLAMP;
+    g_sampler = g_ctx.active_rhi->create_sampler(g_ctx.active_device, &sampler_desc);
 }
 
 static const char *map_backend_to_regname(const char *backend) {
@@ -225,7 +259,8 @@ int maru_engine_init(const char *config_path) {
 
     create_triangle_resources();
 
-    int cw = 0, ch = 0; platform_window_get_size(g_ctx.window, &cw, &ch);
+    int cw = 0, ch = 0;
+    platform_window_get_size(g_ctx.window, &cw, &ch);
     renderer_init(&g_renderer, g_ctx.active_rhi, g_ctx.active_device, cw, ch);
     renderer_set_scene(&g_renderer, record_scene, NULL);
 
@@ -267,6 +302,8 @@ bool maru_engine_tick(void) {
 
 void maru_engine_shutdown(void) {
     if (!initialized) return;
+
+    asset_free_texture(g_texture);
 
     renderer_shutdown(&g_renderer);
 

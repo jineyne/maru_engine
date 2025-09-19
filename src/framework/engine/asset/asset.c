@@ -49,15 +49,8 @@ const char *asset_resolve_path(const char *relpath) {
         return NULL;
     }
 
-    char assets_root[1024];
-    path_join2(assets_root, sizeof(assets_root), g_asset_root, ASSET_SUBDIR);
+    path_join2(buf, sizeof(buf), g_asset_root, rp);
 
-    const char *prefix = "assets/";
-    if (strncmp(rp, prefix, strlen(prefix)) == 0) {
-        path_join2(buf, sizeof(buf), g_asset_root, rp);
-    } else {
-        path_join2(buf, sizeof(buf), assets_root, rp);
-    }
     path_normalize_inplace(buf);
     return buf;
 }

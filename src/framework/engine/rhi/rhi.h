@@ -229,6 +229,7 @@ typedef struct rhi_render_target_desc {
 typedef struct rhi_binding {
     uint32_t binding; /* abstract slot */
     rhi_texture_t *texture; /* SRV */
+    rhi_sampler_t *sampler;
     //TODO: buffer/sampler etc
 } rhi_binding_t;
 

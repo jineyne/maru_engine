@@ -1,5 +1,6 @@
 set(ENGINE_ASSET_SRC
-    "engine/asset/asset.c")
+    "engine/asset/asset.c"
+    "engine/asset/texture.c")
 
 set(ENGINE_RENDERER_SRC
     "engine/renderer/renderer.c")
