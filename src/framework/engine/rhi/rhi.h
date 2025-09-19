@@ -274,10 +274,10 @@ typedef struct rhi_dispatch {
     void (*cmd_end_render)(rhi_cmd_t *);
 
     void (*cmd_bind_pipeline)(rhi_cmd_t *, rhi_pipeline_t *);
-    void (*cmd_bind_set)(rhi_cmd_t *, const rhi_binding_t *binds, int num, uint32_t stages_mask);
-    void (*cmd_bind_const_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *, uint32_t stages_mask);
+    void (*cmd_bind_const_buffer)(rhi_cmd_t *, int slot, rhi_buffer_t *, uint32_t stages);
 
-    void (*cmd_bind_sampler)(rhi_cmd_t *, int slot, rhi_sampler_t *, uint32_t stages);
+    void (*cmd_bind_texture)(rhi_cmd_t *, rhi_texture_t *texture, int slot, uint32_t stages);
+    void (*cmd_bind_sampler)(rhi_cmd_t *, rhi_sampler_t *sampler, int slot, uint32_t stages);
 
     void (*cmd_set_viewport_scissor)(rhi_cmd_t *, int x, int y, int w, int h);
     void (*cmd_set_blend_color)(rhi_cmd_t *, float r, float g, float b, float a);

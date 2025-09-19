@@ -1,21 +1,9 @@
 #include "renderer.h"
+
+#include <stdlib.h>
 #include <string.h>
 
-static const char *s_post_vs =
-"struct VSOut{float4 pos:SV_Position;float2 uv:TEXCOORD0;};"
-"VSOut main(uint vid : SV_VertexID){"
-"  VSOut o;"
-"  float2 pos = (vid == 0) ? float2(-1,-1) : (vid == 1) ? float2( 3,-1) : float2(-1, 3);"
-"  float2 uv  = (vid == 0) ? float2( 0, 0) : (vid == 1) ? float2( 2, 0) : float2( 0, 2);"
-"  o.pos = float4(pos,0,1);"
-"  o.uv = float2(uv.x, 1.0 - uv.y);"
-"  return o;"
-"}";
-
-static const char *s_post_ps =
-    "Texture2D gTex:register(t0);SamplerState gSamp:register(s0);"
-    "float4 main(float4 pos:SV_Position,float2 uv:TEXCOORD0):SV_Target{"
-    "  return gTex.Sample(gSamp, uv); }";
+#include "asset/asset.h"
 
 static void destroy_offscreen(renderer_t *R) {
     if (!R || !R->rhi) return;
@@ -86,13 +74,20 @@ static void destroy_post(renderer_t *R) {
 static void create_post(renderer_t *R) {
     const rhi_dispatch_t *r = R->rhi;
 
+    char *buf = NULL;
+    size_t buf_len;
+    if (asset_read_all("shader\\single_fullscreen.hlsl", &buf, &buf_len) != MARU_OK) {
+        FATAL("unable to load shader");
+        return;
+    }
+
     rhi_shader_desc_t sd = {0};
-    sd.entry_vs = "main";
-    sd.entry_ps = "main";
-    sd.blob_vs = s_post_vs;
-    sd.blob_vs_size = strlen(s_post_vs);
-    sd.blob_ps = s_post_ps;
-    sd.blob_ps_size = strlen(s_post_ps);
+    sd.entry_vs = "VSMain";
+    sd.blob_vs = buf;
+    sd.blob_vs_size = buf_len;
+    sd.entry_ps = "PSMain";
+    sd.blob_ps = buf;
+    sd.blob_ps_size = buf_len;
     R->post_sh = r->create_shader(R->dev, &sd);
 
     rhi_pipeline_desc_t pd = {0};
@@ -111,6 +106,8 @@ static void create_post(renderer_t *R) {
     samp_desc.anisotropy = 1;
     samp_desc.mip_bias = 0.0f;
     R->post_sampler = r->create_sampler(R->dev, &samp_desc);
+
+    free(buf);
 }
 
 int renderer_init(renderer_t *R, const rhi_dispatch_t *rhi, rhi_device_t *dev, int w, int h) {
@@ -164,10 +161,8 @@ void renderer_render(renderer_t *R) {
     r->cmd_bind_pipeline(cmd, R->post_pl);
 
     rhi_binding_t b0[2] = {0};
-    b0[0].binding = 0; b0[0].texture = R->off_color;
-    r->cmd_bind_set(cmd, &b0[0], 1, RHI_STAGE_PS);
-
-    r->cmd_bind_sampler(cmd, 0, R->post_sampler, RHI_STAGE_PS);
+    r->cmd_bind_texture(cmd, R->off_color, 0, RHI_STAGE_PS);
+    r->cmd_bind_sampler(cmd, R->post_sampler, 0, RHI_STAGE_PS);
 
     r->cmd_draw(cmd, 3, 0, 1);
     r->cmd_end_render(cmd);

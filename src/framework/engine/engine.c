@@ -45,7 +45,7 @@ static void update_mvp_from_size(int w, int h) {
     rhi->get_capabilities(g_ctx.active_device, &caps);
 
     if (h <= 0) h = 1;
-    float aspect = (float) w / (float) h;
+    float aspect = (float)w / (float)h;
 
     mat4_t P, V, M, R, PV, MVP;
     perspective_from_caps(&caps, 60.0f * (3.14159265f / 180.0f), aspect, 0.1f, 100.0f, P);
@@ -66,43 +66,25 @@ static void update_mvp_from_size(int w, int h) {
 static void record_scene(rhi_cmd_t *cmd, void *user) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
-    rhi_binding_t binds[2] = { 0 };
-    binds[0].binding = 0;  binds[0].texture = g_texture->internal;
-
-    g_ctx.active_rhi->cmd_bind_set(cmd, binds, 1, RHI_STAGE_PS);
-    g_ctx.active_rhi->cmd_bind_sampler(cmd, 0, g_sampler, RHI_STAGE_PS);
-
     rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
     rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
+
+    rhi->cmd_bind_texture(cmd, g_texture->internal, 0, RHI_STAGE_PS);
+    rhi->cmd_bind_sampler(cmd, g_sampler, 0, RHI_STAGE_PS);
+
     rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
     rhi->cmd_set_index_buffer(cmd, g_triangle_ib);
     rhi->cmd_draw_indexed(cmd, 3, 0, 0, 1);
 }
-
-static const char *s_vs_hlsl =
-    "cbuffer PerFrame : register(b0) { row_major float4x4 uMVP; };"
-    "struct VSIn { float3 pos:POSITION; float3 col:COLOR; float2 uv:TEXCOORD0; };"
-    "struct VSOut{ float4 pos:SV_Position; float3 col:COLOR;  float2 uv:TEXCOORD0; };"
-    "VSOut main(VSIn i){ VSOut o; o.pos = mul(float4(i.pos,1), uMVP); o.col=i.col; o.uv=i.uv; return o; }";
-
-static const char *s_ps_hlsl =
-    "struct PSIn{ float4 pos:SV_Position; float3 col:COLOR; float2 uv:TEXCOORD0; };"
-    "Texture2D    gAlbedo : register(t0);"
-    "SamplerState gSamp   : register(s0);"
-    "float4 main(PSIn i):SV_Target{"
-    "    float4 tex = gAlbedo.Sample(gSamp, i.uv);"
-    "    return tex;"
-    "}";
-
 
 static void create_triangle_resources(void) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
     float vtx[] = {
         //          position             color         uv
-        /* top   */  0.0f,  0.5f, 0.0f,  1,0,0,       0.5f, 0.0f,
-        /* right */  0.5f, -0.5f, 0.0f,  0,0,1,       1.0f, 1.0f,
-        /* left  */ -0.5f, -0.5f, 0.0f,  0,1,0,       0.0f, 1.0f,
+        /* top   */ 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
+        /* right */ 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
+        /* left  */ -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
     };
     rhi_buffer_desc_t bd = {0};
     bd.size = sizeof(vtx);
@@ -115,14 +97,21 @@ static void create_triangle_resources(void) {
     ibd.usage = RHI_BUF_INDEX;
     g_triangle_ib = rhi->create_buffer(g_ctx.active_device, &ibd, idx);
 
-    rhi_shader_desc_t sd = {0};
-    sd.entry_vs = "main";
-    sd.blob_vs = s_vs_hlsl;
-    sd.blob_vs_size = strlen(s_vs_hlsl);
+    char *buf = NULL;
+    size_t buf_len;
+    if (asset_read_all("shader\\default.hlsl", &buf, &buf_len) != MARU_OK) {
+        FATAL("unable to load shader");
+        return;
+    }
 
-    sd.entry_ps = "main";
-    sd.blob_ps = s_ps_hlsl;
-    sd.blob_ps_size = strlen(s_ps_hlsl);
+    rhi_shader_desc_t sd = {0};
+    sd.entry_vs = "VSMain";
+    sd.blob_vs = buf;
+    sd.blob_vs_size = buf_len;
+
+    sd.entry_ps = "PSMain";
+    sd.blob_ps = buf;
+    sd.blob_ps_size = buf_len;
     g_triangle_sh = rhi->create_shader(g_ctx.active_device, &sd);
 
     rhi_pipeline_desc_t pd = (rhi_pipeline_desc_t){0};
@@ -130,7 +119,7 @@ static void create_triangle_resources(void) {
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR",    0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
+        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
         {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
     };
     pd.layout.attrs = attrs;
@@ -176,14 +165,16 @@ static void create_triangle_resources(void) {
     };
     g_texture = asset_load_texture("texture\\karina.jpg", &opts);
 
-    rhi_sampler_desc_t sampler_desc = { 0 };
+    rhi_sampler_desc_t sampler_desc = {0};
     sampler_desc.min_filter = RHI_FILTER_LINEAR;
     sampler_desc.mag_filter = RHI_FILTER_LINEAR;
-    sampler_desc.mip_bias = RHI_FILTER_LINEAR;
+    sampler_desc.mip_bias = 0.0f;
     sampler_desc.wrap_u = RHI_WRAP_CLAMP;
     sampler_desc.wrap_v = RHI_WRAP_CLAMP;
     sampler_desc.wrap_w = RHI_WRAP_CLAMP;
     g_sampler = g_ctx.active_rhi->create_sampler(g_ctx.active_device, &sampler_desc);
+
+    free(buf);
 }
 
 static const char *map_backend_to_regname(const char *backend) {

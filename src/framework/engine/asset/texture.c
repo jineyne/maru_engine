@@ -118,3 +118,8 @@ void asset_free_texture(texture_t *tex) {
     }
     free(tex);
 }
+
+void *asset_texture_get_rhi_handle(texture_t *tex) {
+    if (!tex) return NULL;
+    return tex->internal;
+}

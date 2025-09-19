@@ -186,7 +186,7 @@ static void gles_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
 static rhi_sampler_t *gles_create_sampler(rhi_device_t *d, const rhi_sampler_desc_t *desc) {
     UNUSED(d);
     UNUSED(desc);
-    rhi_sampler_t *s = (rhi_sampler_t *)calloc(1, sizeof(rhi_sampler_t));
+    rhi_sampler_t *s = (rhi_sampler_t*)calloc(1, sizeof(rhi_sampler_t));
     if (!s) return NULL;
     s->_dummy = 1;
     return s;
@@ -317,37 +317,33 @@ static void gles_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {
     UNUSED(p);
 }
 
-static void gles_cmd_bind_set(rhi_cmd_t *c, const rhi_binding_t *binds, int num, uint32_t stages) {
-    UNUSED(stages);
-    static rhi_render_target_t *s_last_rt = NULL;
-
-    for (int i = 0; i < num; ++i) {
-        const rhi_binding_t *b = &binds[i];
-        if (!b->texture || !b->texture->id) continue;
-        if (gl_srv_conflicts_with_rt(b->texture->id, s_last_rt)) {
-            DEBUG_LOG("GL: SRV-RT conflict on unit %u -> skip bind", b->binding);
-            continue;
-        }
-
-        glActiveTexture(GL_TEXTURE0 + b->binding);
-        glBindTexture(b->texture->target, b->texture->id);
-    }
-}
-
-static void gles_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, uint32_t stages_mask) {
+static void gles_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, uint32_t stages) {
     UNUSED(c);
     UNUSED(slot);
     UNUSED(b);
-    UNUSED(stages_mask);
+    UNUSED(stages);
 }
 
-static void gles_cmd_bind_sampler(rhi_cmd_t *c, int slot, rhi_sampler_t *s, uint32_t stages) {
+static void gles_cmd_bind_texture(rhi_cmd_t *c, rhi_texture_t *t, int slot, uint32_t stages) {
+    UNUSED(stages);
+    static rhi_render_target_t *s_last_rt = NULL;
+
+    if (!t || !t->id) return;
+    if (gl_srv_conflicts_with_rt(t->id, s_last_rt)) {
+        DEBUG_LOG("GL: SRV-RT conflict on unit %u -> skip bind", slot);
+        return;
+    }
+
+    glActiveTexture(GL_TEXTURE0 + slot);
+    glBindTexture(t->target, t->id);
+}
+
+static void gles_cmd_bind_sampler(rhi_cmd_t *c, rhi_sampler_t *s, int slot, uint32_t stages) {
     UNUSED(c);
     UNUSED(slot);
     UNUSED(s);
     UNUSED(stages);
 }
-
 
 static void gles_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int h) {
     UNUSED(c);
@@ -419,9 +415,10 @@ PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
         gles_get_backbuffer_rt, gles_render_target_get_color_tex,
         /* commands */
         gles_begin_cmd, gles_end_cmd, gles_cmd_begin_render, gles_cmd_end_render,
-        gles_cmd_bind_pipeline, gles_cmd_bind_set, gles_cmd_bind_const_buffer,
-        gles_cmd_bind_sampler,
-        gles_cmd_set_viewport_scissor, gl_cmd_set_blend_color, gl_cmd_set_depth_bias, gles_cmd_set_vertex_buffer, gles_cmd_set_index_buffer,
+        gles_cmd_bind_pipeline, gles_cmd_bind_const_buffer,
+        gles_cmd_bind_texture, gles_cmd_bind_sampler,
+        gles_cmd_set_viewport_scissor, gl_cmd_set_blend_color, gl_cmd_set_depth_bias, gles_cmd_set_vertex_buffer,
+        gles_cmd_set_index_buffer,
         gles_cmd_draw, gles_cmd_draw_indexed,
         /* sync */
         gles_fence_create, gles_fence_wait, gles_fence_destroy,
