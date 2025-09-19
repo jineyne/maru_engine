@@ -81,10 +81,10 @@ static void create_triangle_resources(void) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
     float vtx[] = {
-        //          position             color         uv
-        /* top   */ 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
-        /* right */ 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
-        /* left  */ -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
+        //          position             color     uv
+        /* top   */  0.0f,  0.5f, 0.0f,  1, 0, 0,  0.5f, 0.0f,
+        /* right */  0.5f, -0.5f, 0.0f,  0, 0, 1,  1.0f, 1.0f,
+        /* left  */ -0.5f, -0.5f, 0.0f,  0, 1, 0,  0.0f, 1.0f,
     };
     rhi_buffer_desc_t bd = {0};
     bd.size = sizeof(vtx);
@@ -160,7 +160,7 @@ static void create_triangle_resources(void) {
 
     asset_texture_opts_t opts = {
         .gen_mips = 1,
-        .flip_y = 1,
+        .flip_y = 0,
         .force_rgba = 1
     };
     g_texture = asset_load_texture("texture\\karina.jpg", &opts);
