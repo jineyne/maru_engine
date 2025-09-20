@@ -1,7 +1,12 @@
 #include "engine.h"
 #include "engine_context.h"
+#include "mem/mem_diag.h"
 #include "platform/window.h"
 #include "rhi/rhi.h"
+
+#if WIN32
+#include <crtdbg.h>
+#endif
 
 extern engine_context_t g_ctx;
 
@@ -16,6 +21,12 @@ int main(void) {
     }
 
     maru_engine_shutdown();
+
+    mem_dump_leaks();
+
+#if WIN32
+    _CrtDumpMemoryLeaks();
+#endif
 
     return 0;
 }

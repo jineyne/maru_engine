@@ -3,6 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "../core/mem/mem_diag.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -31,7 +32,7 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
     size_t filesz = 0;
     if (asset_read_all(relpath, &filebuf, &filesz) != MARU_OK || !filebuf || filesz == 0) {
         MR_LOG(ERROR, "asset_load_texture: failed to read %s", relpath);
-        if (filebuf) free(filebuf);
+        if (filebuf) MARU_FREE(filebuf);
         return NULL;
     }
 
@@ -40,7 +41,7 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
     int w = 0, h = 0, ch = 0;
     const int req_comp = opts.force_rgba ? 4 : 0;
     unsigned char *pixels = stbi_load_from_memory((const unsigned char*) filebuf, (int) filesz, &w, &h, &ch, req_comp);
-    free(filebuf);
+    MARU_FREE(filebuf);
 
     if (!pixels || w <= 0 || h <= 0) {
         MR_LOG(ERROR, "asset_load_texture: stbi decode failed for %s (%s)", relpath, stbi_failure_reason());
@@ -52,7 +53,7 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
     unsigned char *upload_pixels = pixels;
     if (comp != 4) {
         size_t total = (size_t) w * (size_t) h;
-        unsigned char *conv = (unsigned char*) malloc(total * 4);
+        unsigned char *conv = (unsigned char*) MARU_MALLOC(total * 4);
         if (!conv) {
             stbi_image_free(pixels);
             MR_LOG(ERROR, "asset_load_texture: OOM converting to RGBA");
@@ -80,7 +81,7 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
 
     rhi_texture_t *rhi_tex = g_ctx.active_rhi->create_texture(g_ctx.active_device, &td, upload_pixels);
     if (upload_pixels != pixels) {
-        free(upload_pixels);
+        MARU_FREE(upload_pixels);
     } else {
         stbi_image_free(pixels);
     }
@@ -90,7 +91,7 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
         return NULL;
     }
 
-    texture_t *tex = (texture_t*) malloc(sizeof(texture_t));
+    texture_t *tex = (texture_t*) MARU_MALLOC(sizeof(texture_t));
     if (!tex) {
         g_ctx.active_rhi->destroy_texture(g_ctx.active_device, rhi_tex);
         return NULL;
@@ -112,11 +113,11 @@ void asset_free_texture(texture_t *tex) {
         if (g_ctx.active_device && g_ctx.active_rhi && g_ctx.active_rhi->destroy_texture) {
             g_ctx.active_rhi->destroy_texture(g_ctx.active_device, rhi_tex);
         } else {
-            free(rhi_tex);
+            MARU_FREE(rhi_tex);
         }
         tex->internal = NULL;
     }
-    free(tex);
+    MARU_FREE(tex);
 }
 
 void *asset_texture_get_rhi_handle(texture_t *tex) {

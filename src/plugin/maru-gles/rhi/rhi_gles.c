@@ -1,5 +1,6 @@
 #include "rhi_gles.h"
 
+#include "../../../framework/core/mem/mem_diag.h"
 #include <stdlib.h>
 
 struct rhi_device {
@@ -99,16 +100,16 @@ static void gl_apply_states(const rhi_pipeline_desc_t *s) {
 static rhi_device_t *gles_create_device(const rhi_device_desc_t *d) {
     INFO("creating OpenGL ES device");
     UNUSED(d);
-    return (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
+    return (rhi_device_t*) MARU_CALLOC(1, sizeof(rhi_device_t));
 }
 
 static void gles_destroy_device(rhi_device_t *d) {
-    free(d);
+    MARU_FREE(d);
 }
 
 static rhi_swapchain_t *gles_get_swapchain(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_swapchain_t*) calloc(1, sizeof(rhi_swapchain_t));
+    return (rhi_swapchain_t*) MARU_CALLOC(1, sizeof(rhi_swapchain_t));
 }
 
 static void gles_present(rhi_swapchain_t *s) {
@@ -125,12 +126,12 @@ static rhi_buffer_t *gles_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     UNUSED(d);
     UNUSED(desc);
     UNUSED(initial);
-    return (rhi_buffer_t*) calloc(1, sizeof(rhi_buffer_t));
+    return (rhi_buffer_t*) MARU_CALLOC(1, sizeof(rhi_buffer_t));
 }
 
 static void gles_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
     UNUSED(d);
-    free(b);
+    MARU_FREE(b);
 }
 
 static void gles_update_buffer(rhi_device_t *d, rhi_buffer_t *b, const void *data, size_t bytes) {
@@ -143,7 +144,7 @@ static void gles_update_buffer(rhi_device_t *d, rhi_buffer_t *b, const void *dat
 static rhi_texture_t *gles_create_texture(rhi_device_t *d, const rhi_texture_desc_t *desc, const void *initial) {
     UNUSED(d);
     UNUSED(initial);
-    rhi_texture_t *t = (rhi_texture_t*) calloc(1, sizeof(*t));
+    rhi_texture_t *t = (rhi_texture_t*) MARU_CALLOC(1, sizeof(*t));
     glGenTextures(1, &t->id);
     t->target = GL_TEXTURE_2D;
     t->w = desc->width;
@@ -180,13 +181,13 @@ static void gles_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
         glDeleteTextures(1, &t->id);
     }
 
-    free(t);
+    MARU_FREE(t);
 }
 
 static rhi_sampler_t *gles_create_sampler(rhi_device_t *d, const rhi_sampler_desc_t *desc) {
     UNUSED(d);
     UNUSED(desc);
-    rhi_sampler_t *s = (rhi_sampler_t*) calloc(1, sizeof(rhi_sampler_t));
+    rhi_sampler_t *s = (rhi_sampler_t*) MARU_CALLOC(1, sizeof(rhi_sampler_t));
     if (!s) return NULL;
     s->_dummy = 1;
     return s;
@@ -195,36 +196,36 @@ static rhi_sampler_t *gles_create_sampler(rhi_device_t *d, const rhi_sampler_des
 static void gles_destroy_sampler(rhi_device_t *d, rhi_sampler_t *s) {
     UNUSED(d);
     if (!s) return;
-    free(s);
+    MARU_FREE(s);
 }
 
 
 static rhi_shader_t *gles_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
     UNUSED(d);
     UNUSED(sd);
-    return (rhi_shader_t*) calloc(1, sizeof(rhi_shader_t));
+    return (rhi_shader_t*) MARU_CALLOC(1, sizeof(rhi_shader_t));
 }
 
 static void gles_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
     UNUSED(d);
-    free(s);
+    MARU_FREE(s);
 }
 
 static rhi_pipeline_t *gles_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     UNUSED(d);
-    rhi_pipeline_t *p = (rhi_pipeline_t*) calloc(1, sizeof(rhi_pipeline_t));
+    rhi_pipeline_t *p = (rhi_pipeline_t*) MARU_CALLOC(1, sizeof(rhi_pipeline_t));
     p->sh = pd->shader;
     return p;
 }
 
 static void gles_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p) {
     UNUSED(d);
-    free(p);
+    MARU_FREE(p);
 }
 
 static rhi_render_target_t *gles_create_render_target(rhi_device_t *d, const rhi_render_target_desc_t *desc) {
     UNUSED(d);
-    rhi_render_target_t *rt = (rhi_render_target_t*) calloc(1, sizeof(*rt));
+    rhi_render_target_t *rt = (rhi_render_target_t*) MARU_CALLOC(1, sizeof(*rt));
     glGenFramebuffers(1, &rt->fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
 
@@ -255,7 +256,7 @@ static rhi_render_target_t *gles_create_render_target(rhi_device_t *d, const rhi
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDeleteFramebuffers(1, &rt->fbo);
-        free(rt);
+        MARU_FREE(rt);
         return NULL;
     }
 
@@ -270,14 +271,14 @@ static void gles_destroy_render_target(rhi_device_t *d, rhi_render_target_t *rt)
         glDeleteFramebuffers(1, &rt->fbo);
     }
 
-    free(rt);
+    MARU_FREE(rt);
 }
 
 static rhi_render_target_t *gles_get_backbuffer_rt(rhi_device_t *d) {
     UNUSED(d);
     static rhi_render_target_t *s = NULL;
     if (!s) {
-        s = (rhi_render_target_t*) calloc(1, sizeof(*s));
+        s = (rhi_render_target_t*) MARU_CALLOC(1, sizeof(*s));
         s->is_backbuffer = 1;
     }
     return s;
@@ -291,12 +292,12 @@ static rhi_texture_t *gles_render_target_get_color_tex(rhi_render_target_t *rt, 
 
 static rhi_cmd_t *gles_begin_cmd(rhi_device_t *d) {
     UNUSED(d);
-    rhi_cmd_t *c = (rhi_cmd_t*) calloc(1, sizeof(rhi_cmd_t));
+    rhi_cmd_t *c = (rhi_cmd_t*) MARU_CALLOC(1, sizeof(rhi_cmd_t));
     if (c) c->current_rt = NULL;
     return c;
 }
 
-static void gles_end_cmd(rhi_cmd_t *c) { free(c); }
+static void gles_end_cmd(rhi_cmd_t *c) { MARU_FREE(c); }
 
 static void gles_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const float clear_rgba[4]) {
     rhi_render_target_t *use = rt ? rt : gles_get_backbuffer_rt(NULL);
@@ -412,11 +413,11 @@ static void gles_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t fir
 
 static rhi_fence_t *gles_fence_create(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_fence_t*) calloc(1, sizeof(rhi_fence_t));
+    return (rhi_fence_t*) MARU_CALLOC(1, sizeof(rhi_fence_t));
 }
 
 static void gles_fence_wait(rhi_fence_t *f) { UNUSED(f); }
-static void gles_fence_destroy(rhi_fence_t *f) { free(f); }
+static void gles_fence_destroy(rhi_fence_t *f) { MARU_FREE(f); }
 
 PLUGIN_API const rhi_dispatch_t *maru_rhi_entry(void) {
     static const rhi_dispatch_t vtbl = {

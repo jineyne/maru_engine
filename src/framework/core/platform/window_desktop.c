@@ -1,3 +1,4 @@
+#include "mem/mem_diag.h"
 #if !defined(ANDROID) && !defined(__ANDROID__) && !defined(MARU_PLATFORM_IOS)
 
 #include "window.h"
@@ -37,7 +38,7 @@ platform_window_t *platform_window_create(void *native_handle, int width, int he
         return NULL;
     }
 
-    platform_window_t *pw = (platform_window_t*) calloc(1, sizeof(platform_window_t));
+    platform_window_t *pw = (platform_window_t*) MARU_MALLOC(sizeof(platform_window_t));
     pw->width = width;
     pw->height = height;
     pw->vsync = vsync ? 1 : 0;

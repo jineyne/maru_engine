@@ -1,12 +1,13 @@
 #include "config.h"
 
+#include "../core/mem/mem_diag.h"
 #include <stdlib.h>
 #include <string.h>
 
 static char *str_dup(const char *s) {
     if (!s) return NULL;
     size_t n = strlen(s) + 1;
-    char *p = (char*) malloc(n);
+    char *p = (char*) MARU_MALLOC(n);
     if (!p) return NULL;
     memcpy(p, s, n);
     return p;
@@ -23,7 +24,7 @@ int config_load(const char *engine_json, maru_config_t *out) {
     }
 
     json_value_t *root = json_parse(buf);
-    free(buf);
+    MARU_FREE(buf);
     if (!root) return MARU_ERR_PARSE;
 
     out->graphics_backend = str_dup(json_get_string(root, "graphics.backend", "dx11"));
@@ -41,15 +42,15 @@ int config_load(const char *engine_json, maru_config_t *out) {
 void config_free(maru_config_t *cfg) {
     if (!cfg) return;
     if (cfg->graphics_backend) {
-        free(cfg->graphics_backend);
+        MARU_FREE(cfg->graphics_backend);
         cfg->graphics_backend = NULL;
     }
     if (cfg->audio_backend) {
-        free(cfg->audio_backend);
+        MARU_FREE(cfg->audio_backend);
         cfg->audio_backend = NULL;
     }
     if (cfg->plugin_paths) {
-        free(cfg->plugin_paths);
+        MARU_FREE(cfg->plugin_paths);
         cfg->plugin_paths = NULL;
     }
 }

@@ -336,6 +336,35 @@ void maru_engine_shutdown(void) {
 
     asset_free_texture(g_texture);
 
+    if (g_ctx.active_rhi) {
+        const rhi_dispatch_t *rhi = g_ctx.active_rhi;
+
+        if (g_sampler) {
+            rhi->destroy_sampler(g_ctx.active_device, g_sampler);
+            g_sampler = NULL;
+        }
+        if (g_triangle_pl) {
+            rhi->destroy_pipeline(g_ctx.active_device, g_triangle_pl);
+            g_triangle_pl = NULL;
+        }
+        if (g_triangle_sh) {
+            rhi->destroy_shader(g_ctx.active_device, g_triangle_sh);
+            g_triangle_sh = NULL;
+        }
+        if (g_mvp_cb) {
+            rhi->destroy_buffer(g_ctx.active_device, g_mvp_cb);
+            g_mvp_cb = NULL;
+        }
+        if (g_triangle_ib) {
+            rhi->destroy_buffer(g_ctx.active_device, g_triangle_ib);
+            g_triangle_ib = NULL;
+        }
+        if (g_triangle_vb) {
+            rhi->destroy_buffer(g_ctx.active_device, g_triangle_vb);
+            g_triangle_vb = NULL;
+        }
+    }
+
     renderer_shutdown(&g_renderer);
 
     engine_context_shutdown(&g_ctx);

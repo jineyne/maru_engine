@@ -1,5 +1,6 @@
 #include "rhi_dx11.h"
 
+#include "../../../framework/core/mem/mem_diag.h"
 #include <stdlib.h>
 
 #include "export.h"
@@ -172,7 +173,7 @@ static int dx11_create_backbuffer_rtv(dx11_state_t *st) {
 static void dx11_refresh_backbuffer_rt(dx11_state_t *st) {
     if (!st || !st->rtv) return;
     if (!st->back_rt) {
-        st->back_rt = (rhi_render_target_t*) calloc(1, sizeof(rhi_render_target_t));
+        st->back_rt = (rhi_render_target_t*) MARU_CALLOC(1, sizeof(rhi_render_target_t));
     }
 
     dx11_rt_t *rt = &st->back_rt->rt;
@@ -191,7 +192,7 @@ static void dx11_refresh_backbuffer_rt(dx11_state_t *st) {
 static void dx11_drop_backbuffer_rt(dx11_state_t *st) {
     if (!st) return;
     if (st->back_rt) {
-        free(st->back_rt);
+        MARU_FREE(st->back_rt);
         st->back_rt = NULL;
     }
 }
@@ -358,7 +359,7 @@ static UINT mip_count_from_wh(UINT w, UINT h) {
 static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
     if (!desc || !desc->native_window) return NULL;
 
-    dx11_state_t *st = (dx11_state_t*) calloc(1, sizeof(dx11_state_t));
+    dx11_state_t *st = (dx11_state_t*) MARU_CALLOC(1, sizeof(dx11_state_t));
     if (!st) return NULL;
 
     st->hwnd = (HWND) desc->native_window;
@@ -393,22 +394,22 @@ static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
                                                D3D11_SDK_VERSION, &sd, &st->sc, &st->dev, &got, &st->ctx);
     if (FAILED(hr)) {
         dx11_release_all(st);
-        free(st);
+        MARU_FREE(st);
         return NULL;
     }
 
     if (dx11_create_backbuffer_rtv(st) != 0) {
         dx11_release_all(st);
-        free(st);
+        MARU_FREE(st);
         return NULL;
     }
 
     dx11_refresh_backbuffer_rt(st);
 
-    rhi_device_t *dev = (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
+    rhi_device_t *dev = (rhi_device_t*) MARU_CALLOC(1, sizeof(rhi_device_t));
     if (!dev) {
         dx11_release_all(st);
-        free(st);
+        MARU_FREE(st);
         return NULL;
     }
     dev->st = st;
@@ -421,14 +422,14 @@ static void dx11_destroy_device(rhi_device_t *d) {
 
     dx11_state_t *st = d->st;
     dx11_release_all(st);
-    free(st);
+    MARU_FREE(st);
 
-    free(d);
+    MARU_FREE(d);
 }
 
 static rhi_swapchain_t *dx11_get_swapchain(rhi_device_t *desc) {
     if (!desc || !desc->st) return NULL;
-    rhi_swapchain_t *s = (rhi_swapchain_t*) calloc(1, sizeof(rhi_swapchain_t));
+    rhi_swapchain_t *s = (rhi_swapchain_t*) MARU_CALLOC(1, sizeof(rhi_swapchain_t));
     if (!s) return NULL;
     s->st = desc->st;
     return s;
@@ -505,7 +506,7 @@ static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     HRESULT hr = ID3D11Device_CreateBuffer(d->st->dev, &bd, initial ? &srd : NULL, &buf);
     if (FAILED(hr)) return NULL;
 
-    rhi_buffer_t *b = (rhi_buffer_t*) calloc(1, sizeof(rhi_buffer_t));
+    rhi_buffer_t *b = (rhi_buffer_t*) MARU_CALLOC(1, sizeof(rhi_buffer_t));
     b->vb.buf = buf;
     b->vb.size = desc->size;
     b->vb.stride = desc->stride;
@@ -538,7 +539,7 @@ static void dx11_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
     if (b->vb.buf) {
         ID3D11Buffer_Release(b->vb.buf);
     }
-    free(b);
+    MARU_FREE(b);
 }
 
 static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_desc_t *desc, const void *initial) {
@@ -573,7 +574,7 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
     }
 
 
-    rhi_texture_t *tex = (rhi_texture_t*) calloc(1, sizeof(*tex));
+    rhi_texture_t *tex = (rhi_texture_t*) MARU_CALLOC(1, sizeof(rhi_texture_t));
     if (!tex) return NULL;
 
     D3D11_TEXTURE2D_DESC td = {0};
@@ -601,14 +602,14 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
         const size_t bpp = bytes_per_pixel_dxgi(base_fmt);
         if (bpp == 0) {
             MR_LOG(ERROR, "Unsupported initial-data format for DXGI format %d", (int)base_fmt);
-            free(tex);
+            MARU_FREE(tex);
             return NULL;
         }
 
         UINT mip_count = td.MipLevels;
-        subs = (D3D11_SUBRESOURCE_DATA*) malloc(sizeof(D3D11_SUBRESOURCE_DATA) * mip_count);
+        subs = (D3D11_SUBRESOURCE_DATA*) MARU_MALLOC(sizeof(D3D11_SUBRESOURCE_DATA) * mip_count);
         if (!subs) {
-            free(tex);
+            MARU_FREE(tex);
             return NULL;
         }
 
@@ -634,11 +635,11 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
 
     hr = ID3D11Device_CreateTexture2D(st->dev, &td, init_data, &tex->t.tex);
     if (subs) {
-        free(subs);
+        MARU_FREE(subs);
     }
 
     if (FAILED(hr)) {
-        free(tex);
+        MARU_FREE(tex);
         return NULL;
     }
 
@@ -719,7 +720,7 @@ fail:
         ID3D11Texture2D_Release(tex->t.tex);
     }
 
-    free(tex);
+    MARU_FREE(tex);
     return NULL;
 }
 
@@ -744,7 +745,7 @@ static void dx11_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
         ID3D11Texture2D_Release(t->t.tex);
     }
 
-    free(t);
+    MARU_FREE(t);
 }
 
 static rhi_sampler_t *dx11_create_sampler(rhi_device_t *d, const rhi_sampler_desc_t *desc) {
@@ -770,7 +771,7 @@ static rhi_sampler_t *dx11_create_sampler(rhi_device_t *d, const rhi_sampler_des
     HRESULT hr = ID3D11Device_CreateSamplerState(d->st->dev, &sd, &state);
     if (FAILED(hr)) return NULL;
 
-    rhi_sampler_t *s = (rhi_sampler_t*) calloc(1, sizeof(rhi_sampler_t));
+    rhi_sampler_t *s = (rhi_sampler_t*) MARU_CALLOC(1, sizeof(rhi_sampler_t));
     s->state = state;
     return s;
 }
@@ -780,7 +781,7 @@ static void dx11_destroy_sampler(rhi_device_t *d, rhi_sampler_t *s) {
     if (!s) return;
     if (s->state)
         ID3D11SamplerState_Release(s->state);
-    free(s);
+    MARU_FREE(s);
 }
 
 static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
@@ -828,7 +829,7 @@ static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t
         return NULL;
     }
 
-    rhi_shader_t *sh = (rhi_shader_t*) calloc(1, sizeof(rhi_shader_t));
+    rhi_shader_t *sh = (rhi_shader_t*) MARU_CALLOC(1, sizeof(rhi_shader_t));
     sh->sh.vs = vs;
     sh->sh.ps = ps;
     sh->sh.vs_blob = vsb;
@@ -852,7 +853,7 @@ static void dx11_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
     if (s->sh.vs_blob) {
         ID3D10Blob_Release(s->sh.vs_blob);
     }
-    free(s);
+    MARU_FREE(s);
 }
 
 static void dx11_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p);
@@ -860,7 +861,7 @@ static void dx11_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p);
 static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     if (!d || !pd || !pd->shader) return NULL;
 
-    rhi_pipeline_t *p = (rhi_pipeline_t*) calloc(1, sizeof(rhi_pipeline_t));
+    rhi_pipeline_t *p = (rhi_pipeline_t*) MARU_CALLOC(1, sizeof(rhi_pipeline_t));
     p->p.sh = pd->shader;
 
     D3D11_INPUT_ELEMENT_DESC il[32];
@@ -887,7 +888,7 @@ static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_
             (SIZE_T)ID3D10Blob_GetBufferSize(p->p.sh->sh.vs_blob), &p->p.il);
 
         if (FAILED(hr)) {
-            free(p);
+            MARU_FREE(p);
             return NULL;
         }
 
@@ -958,14 +959,14 @@ static void dx11_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p) {
         ID3D11RasterizerState_Release(p->p.rs);
     }
 
-    free(p);
+    MARU_FREE(p);
 }
 
 static rhi_render_target_t *dx11_create_render_target(rhi_device_t *d, const rhi_render_target_desc_t *desc) {
     if (!d || !d->st || !desc) return NULL;
     dx11_state_t *st = d->st;
 
-    rhi_render_target_t *rt = (rhi_render_target_t*) calloc(1, sizeof(*rt));
+    rhi_render_target_t *rt = (rhi_render_target_t*) MARU_CALLOC(1, sizeof(rhi_render_target_t));
     dx11_rt_t *dxrt = &rt->rt;
     dxrt->st = st;
     dxrt->is_backbuffer = 0;
@@ -975,7 +976,7 @@ static rhi_render_target_t *dx11_create_render_target(rhi_device_t *d, const rhi
     for (int i = 0; i < desc->color_count; ++i) {
         rhi_texture_t *t = desc->color[i].texture;
         if (!t || !t->t.rtv) {
-            free(rt);
+            MARU_FREE(rt);
             return NULL;
         }
         dxrt->rtvs[i] = t->t.rtv;
@@ -1014,7 +1015,7 @@ static void dx11_destroy_render_target(rhi_device_t *d, rhi_render_target_t *rt)
         }
     }
 
-    free(rt);
+    MARU_FREE(rt);
 }
 
 static rhi_render_target_t *dx11_get_backbuffer_rt(rhi_device_t *d) {
@@ -1030,7 +1031,7 @@ static rhi_texture_t *dx11_render_target_get_color_tex(rhi_render_target_t *rt, 
 }
 
 static rhi_cmd_t *dx11_begin_cmd(rhi_device_t *d) {
-    rhi_cmd_t *c = (rhi_cmd_t*) calloc(1, sizeof(rhi_cmd_t));
+    rhi_cmd_t *c = (rhi_cmd_t*) MARU_CALLOC(1, sizeof(rhi_cmd_t));
     if (!c) return NULL;
     c->st = d->st;
     c->current_rt = NULL;
@@ -1038,7 +1039,7 @@ static rhi_cmd_t *dx11_begin_cmd(rhi_device_t *d) {
 }
 
 static void dx11_end_cmd(rhi_cmd_t *c) {
-    free(c);
+    MARU_FREE(c);
 }
 
 static void dx11_get_rt_size(dx11_rt_t *rt, int *out_w, int *out_h) {
@@ -1238,7 +1239,7 @@ static void dx11_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t fir
 
 static rhi_fence_t *dx11_fence_create(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_fence_t*) calloc(1, sizeof(rhi_fence_t));
+    return (rhi_fence_t*) MARU_CALLOC(1, sizeof(rhi_fence_t));
 }
 
 static void dx11_fence_wait(rhi_fence_t *f) {
@@ -1246,7 +1247,7 @@ static void dx11_fence_wait(rhi_fence_t *f) {
 }
 
 static void dx11_fence_destroy(rhi_fence_t *f) {
-    free(f);
+    MARU_FREE(f);
 }
 
 static void dx11_get_capabilities(rhi_device_t *dev, rhi_capabilities_t *out) {

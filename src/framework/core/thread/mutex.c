@@ -1,5 +1,7 @@
 #include "mutex.h"
 
+#include "mem/mem_diag.h"
+
 #if defined(_WIN32)
 #include <windows.h>
 struct mutex { CRITICAL_SECTION cs; };
@@ -12,7 +14,7 @@ struct mutex { pthread_mutex_t m; };
 
 
 mutex_t *maru_mutex_create(void) {
-    mutex_t *m = (mutex_t*)malloc(sizeof(mutex_t));
+    mutex_t *m = (mutex_t*)MARU_MALLOC(sizeof(mutex_t));
     if (!m) {
         return NULL;
     }
