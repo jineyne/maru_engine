@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "asset/asset.h"
+#include "mem/mem_diag.h"
 
 static void destroy_offscreen(renderer_t *R) {
     if (!R || !R->rhi) return;
@@ -74,9 +75,9 @@ static void destroy_post(renderer_t *R) {
 static void create_post(renderer_t *R) {
     const rhi_dispatch_t *r = R->rhi;
 
-    char *buf = NULL;
     size_t buf_len;
-    if (asset_read_all("shader\\single_fullscreen.hlsl", &buf, &buf_len) != MARU_OK) {
+    char *buf = asset_read_all("shader\\single_fullscreen.hlsl", &buf_len, TRUE);
+    if (buf == NULL) {
         FATAL("unable to load shader");
         return;
     }
@@ -107,7 +108,7 @@ static void create_post(renderer_t *R) {
     samp_desc.mip_bias = 0.0f;
     R->post_sampler = r->create_sampler(R->dev, &samp_desc);
 
-    free(buf);
+    MARU_FREE(buf);
 }
 
 int renderer_init(renderer_t *R, const rhi_dispatch_t *rhi, rhi_device_t *dev, int w, int h) {

@@ -58,10 +58,12 @@ platform_window_t *platform_window_create(void *native_handle, int width, int he
 
 void platform_window_destroy(platform_window_t *pw) {
     if (!pw) return;
+
     if (pw->handle) {
         glfwDestroyWindow((GLFWwindow*) pw->impl);
     }
-    free(pw);
+
+    MARU_FREE(pw);
     glfwTerminate();
 }
 

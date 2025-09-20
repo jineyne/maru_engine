@@ -5,28 +5,72 @@
 
 #include "mem/mem_diag.h"
 
-int fs_read_all(const char *path, char **out_buf, size_t *out_size) {
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        return MARU_ERR_IO;
+int fs_get_size(const char *path, size_t *out_size) {
+    if (!path || !out_size) {
+        return MARU_ERR_INVALID;
     }
 
-    fseek(f, 0, SEEK_END);
-    long len = ftell(f);
-    fseek(f, 0, SEEK_SET);
+    FILE *f = fopen(path, "rb");
+    if (!f) return MARU_ERR_IO;
 
-    char *buf = (char*) MARU_MALLOC((size_t) len + 1);
-    if (!buf) {
+    if (fseek(f, 0, SEEK_END) != 0) {
         fclose(f);
         return MARU_ERR_IO;
     }
 
-    size_t rd = fread(buf, 1, (size_t) len, f);
-    fclose(f);
-    buf[rd] = '\0';
+    long len = ftell(f);
+    if (len < 0) {
+        fclose(f);
+        return MARU_ERR_IO;
+    }
 
-    if (out_buf) *out_buf = buf;
-    if (out_size) *out_size = rd;
+    fclose(f);
+    *out_size = (size_t) len;
+    return MARU_OK;
+}
+
+int fs_read_into(const char *path, void **out_buf, size_t cap, size_t *out_size, int need_null_terminator) {
+    if (!path) {
+        return MARU_ERR_INVALID;
+    }
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return MARU_ERR_IO;
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return MARU_ERR_IO;
+    }
+
+    long len = ftell(f);
+    if (len < 0) {
+        fclose(f);
+        return MARU_ERR_IO;
+    }
+
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return MARU_ERR_IO;
+    }
+
+    size_t want = (size_t) len;
+    size_t need = want + ((need_null_terminator) ? 1 : 0);
+    if (out_buf == NULL) {
+        if (out_size) *out_size = want;
+        return MARU_OK;
+    }
+
+    if (cap < need) {
+        fclose(f);
+        return MARU_ERR_IO;
+    }
+    
+    size_t rd = fread(*out_buf, 1, want, f);
+    fclose(f);
+
+    if (need_null_terminator) {
+        ((unsigned char*) *out_buf)[rd] = 0;
+    }
 
     return MARU_OK;
 }

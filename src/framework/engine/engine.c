@@ -16,6 +16,7 @@
 #include "platform/window.h"
 
 #include "time.h"
+#include "mem/mem_diag.h"
 
 typedef struct boot_prof_s {
     uint64_t t0;
@@ -122,9 +123,9 @@ static void create_triangle_resources(void) {
     ibd.usage = RHI_BUF_INDEX;
     g_triangle_ib = rhi->create_buffer(g_ctx.active_device, &ibd, idx);
 
-    char *buf = NULL;
-    size_t buf_len;
-    if (asset_read_all("shader\\default.hlsl", &buf, &buf_len) != MARU_OK) {
+    size_t buf_len = 0;
+    char *buf = asset_read_all("shader\\default.hlsl", &buf_len, TRUE);
+    if (buf == NULL) {
         FATAL("unable to load shader");
         return;
     }
@@ -199,7 +200,7 @@ static void create_triangle_resources(void) {
     sampler_desc.wrap_w = RHI_WRAP_CLAMP;
     g_sampler = g_ctx.active_rhi->create_sampler(g_ctx.active_device, &sampler_desc);
 
-    free(buf);
+    MARU_FREE(buf);
 }
 
 static const char *map_backend_to_regname(const char *backend) {

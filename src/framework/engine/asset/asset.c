@@ -6,6 +6,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "mem/mem_diag.h"
+
+#define ASSET_ROOT_REL "../../content"
+#define ASSET_SUBDIR   "assets"
 
 static char g_asset_root[512] = {0};
 
@@ -55,8 +59,31 @@ const char *asset_resolve_path(const char *relpath) {
     return buf;
 }
 
-int asset_read_all(const char *relpath, char **out_buf, size_t *out_size) {
+int asset_read_into(const char *relpath, void **out_buf, size_t cap, size_t *out_size, int need_null_terminator) {
     const char *abs = asset_resolve_path(relpath);
-    if (!abs) return MARU_ERR_INVALID;
-    return fs_read_all(abs, out_buf, out_size);
+    if (!abs) {
+        return MARU_ERR_INVALID;
+    }
+
+    return fs_read_into(abs, out_buf, cap, out_size, need_null_terminator);
+}
+
+char *asset_read_all(const char *relpath, size_t *out_size, int need_null_terminator) {
+    const char *abs = asset_resolve_path(relpath);
+    if (!abs) {
+        return NULL;
+    }
+
+    char *buf = NULL;
+    if (fs_read_into(abs, NULL, 0, out_size, need_null_terminator) != MARU_OK || *out_size == 0) {
+        return NULL;
+    }
+
+    buf = MARU_MALLOC(*out_size + 1);
+    if (fs_read_into(abs, &buf, *out_size + 1, out_size, need_null_terminator) != MARU_OK || buf == 0) {
+        MARU_FREE(buf);
+        return NULL;
+    }
+
+    return buf;
 }

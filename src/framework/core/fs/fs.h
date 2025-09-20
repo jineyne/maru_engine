@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include "error.h"
 
-int fs_read_all(const char *path, char **out_buf, size_t *out_size);
+int fs_get_size(const char *path, size_t *out_size);
+
+int fs_read_into(const char *path, void **out_buf, size_t cap, size_t *out_size, int need_null_terminator);
+
 
 #endif /* MARU_FS_H */

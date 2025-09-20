@@ -17,9 +17,15 @@ int config_load(const char *engine_json, maru_config_t *out) {
     if (!out) return MARU_ERR_INVALID;
     *out = (maru_config_t){0};
 
-    char *buf = NULL;
+    size_t file_size = 0;
+    if (fs_read_into(engine_json, NULL, 0, &file_size, TRUE) != MARU_OK || file_size == 0) {
+        return MARU_ERR_IO;
+    }
+
+    char *buf = MARU_CALLOC(file_size + 1, sizeof(char));
+    memset(buf, 0, file_size + 1);
     size_t sz = 0;
-    if (fs_read_all(engine_json, &buf, &sz) != MARU_OK) {
+    if (fs_read_into(engine_json, &buf, file_size + 1, &sz, TRUE) != MARU_OK) {
         return MARU_ERR_IO;
     }
 

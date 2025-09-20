@@ -28,11 +28,10 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
     asset_texture_opts_t opts = {.gen_mips = 1, .flip_y = 1, .force_rgba = 1};
     if (opts_in) opts = *opts_in;
 
-    char *filebuf = NULL;
-    size_t filesz = 0;
-    if (asset_read_all(relpath, &filebuf, &filesz) != MARU_OK || !filebuf || filesz == 0) {
+    size_t buf_len;
+    char *buf = asset_read_all(relpath, &buf_len, TRUE);
+    if (buf == NULL) {
         MR_LOG(ERROR, "asset_load_texture: failed to read %s", relpath);
-        if (filebuf) MARU_FREE(filebuf);
         return NULL;
     }
 
@@ -40,8 +39,8 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
 
     int w = 0, h = 0, ch = 0;
     const int req_comp = opts.force_rgba ? 4 : 0;
-    unsigned char *pixels = stbi_load_from_memory((const unsigned char*) filebuf, (int) filesz, &w, &h, &ch, req_comp);
-    MARU_FREE(filebuf);
+    unsigned char *pixels = stbi_load_from_memory((const unsigned char*) buf, (int) buf_len, &w, &h, &ch, req_comp);
+    MARU_FREE(buf);
 
     if (!pixels || w <= 0 || h <= 0) {
         MR_LOG(ERROR, "asset_load_texture: stbi decode failed for %s (%s)", relpath, stbi_failure_reason());

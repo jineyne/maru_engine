@@ -7,6 +7,7 @@
 #include "fs/fs.h"
 #include "misc/cjson.h"
 #include "macro.h"
+#include "mem/mem_diag.h"
 
 struct json_value {
     cJSON *root;
@@ -120,12 +121,15 @@ static int json_merge_includes_for_file(cJSON *dst_root, const char *base_file_p
         char incpath[1024];
         path_join(incpath, sizeof(incpath), basedir, it->valuestring);
 
-        char *buf = NULL;
+        size_t file_size = 0;
+        if (fs_read_into(incpath, NULL, 0, &file_size, FALSE) != MARU_OK) continue;
+
+        char *buf = MARU_CALLOC(file_size + 1, sizeof(char));
         size_t sz = 0;
-        if (fs_read_all(incpath, &buf, &sz) != MARU_OK) continue;
+        if (fs_read_into(incpath, &buf, file_size + 1, &sz, TRUE) != MARU_OK) continue;
 
         cJSON *inc_root = cJSON_ParseWithLength(buf, sz);
-        free(buf);
+        MARU_FREE(buf);
         if (!inc_root) continue;
 
         json_merge_includes_for_file(inc_root, incpath);
@@ -139,15 +143,19 @@ static int json_merge_includes_for_file(cJSON *dst_root, const char *base_file_p
 json_value_t *json_parse_file(const char *path) {
     if (!path) return NULL;
 
-    char *buf = NULL;
+    size_t file_size = 0;
+    if (fs_read_into(path, NULL, 0, &file_size, FALSE) != MARU_OK || file_size == 0) {
+        return NULL;
+    }
+
+    char *buf = MARU_CALLOC(file_size + 1, sizeof(char));
     size_t sz = 0;
-    if (fs_read_all(path, &buf, &sz) != MARU_OK) return NULL;
+    if (fs_read_into(path, &buf, file_size + 1, &sz, TRUE) != MARU_OK) return NULL;
 
     cJSON *r = cJSON_ParseWithLength(buf, sz);
-    free(buf);
+    MARU_FREE(buf);
     if (!r) return NULL;
 
-    /* includes º´ÇÕ */
     json_merge_includes_for_file(r, path);
 
     json_value_t *v = (json_value_t*) malloc(sizeof(json_value_t));
@@ -174,8 +182,11 @@ void json_free(json_value_t *v) {
 
 const char *json_get_string(const json_value_t *v, const char *dotted_key, const char *defval) {
     if (!v || !v->root || !dotted_key) return defval;
+
     cJSON *node = find_by_dotted(v->root, dotted_key);
-    if (cJSON_IsString(node) && node->valuestring) return node->valuestring;
+    if (cJSON_IsString(node) && node->valuestring) {
+        return node->valuestring;
+    }
     return defval;
 }
 

@@ -36,7 +36,7 @@ void maru_mutex_destroy(mutex_t *m) {
 #elif defined(__APPLE__) || defined(__linux__)
     pthread_mutex_destroy(&m->m);
 #endif
-    free(m);
+    MARU_FREE(m);
 }
 
 void maru_mutex_lock(mutex_t *m) {

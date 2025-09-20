@@ -7,6 +7,9 @@ extern "C" {
 
 #define UNUSED(x) (void)(x)
 
+#define TRUE 1
+#define FALSE 0
+
 #if defined(__GNUC__) || defined(__clang__)
 #define LIKELY(x)   __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
