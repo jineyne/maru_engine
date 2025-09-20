@@ -878,38 +878,34 @@ static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_
         };
     }
 
+    HRESULT hr;
+
     if (il_count == 0) {
-        FATAL("DX11: pipeline requires at least one vertex attribute");
+        p->p.il = NULL;
+    } else {
+        hr = ID3D11Device_CreateInputLayout(d->st->dev, il, il_count, ID3D10Blob_GetBufferPointer(p->p.sh->sh.vs_blob), 
+            (SIZE_T)ID3D10Blob_GetBufferSize(p->p.sh->sh.vs_blob), &p->p.il);
 
-        free(p);
-        return NULL;
-    }
+        if (FAILED(hr)) {
+            free(p);
+            return NULL;
+        }
 
-    HRESULT hr = ID3D11Device_CreateInputLayout(
-        d->st->dev, il, il_count,
-        ID3D10Blob_GetBufferPointer(p->p.sh->sh.vs_blob),
-        (SIZE_T)ID3D10Blob_GetBufferSize(p->p.sh->sh.vs_blob),
-        &p->p.il);
+        D3D11_BLEND_DESC bd = { 0 };
+        bd.RenderTarget[0].BlendEnable = pd->blend.enable ? TRUE : FALSE;
+        bd.RenderTarget[0].SrcBlend = map_blend_factor(pd->blend.src_rgb);
+        bd.RenderTarget[0].DestBlend = map_blend_factor(pd->blend.dst_rgb);
+        bd.RenderTarget[0].BlendOp = map_blend_op(pd->blend.op_rgb);
+        bd.RenderTarget[0].SrcBlendAlpha = map_blend_factor(pd->blend.src_a);
+        bd.RenderTarget[0].DestBlendAlpha = map_blend_factor(pd->blend.dst_a);
+        bd.RenderTarget[0].BlendOpAlpha = map_blend_op(pd->blend.op_a);
+        bd.RenderTarget[0].RenderTargetWriteMask = pd->blend.write_mask ? pd->blend.write_mask : 0x0F;
 
-    if (FAILED(hr)) {
-        free(p);
-        return NULL;
-    }
-
-    D3D11_BLEND_DESC bd = {0};
-    bd.RenderTarget[0].BlendEnable = pd->blend.enable ? TRUE : FALSE;
-    bd.RenderTarget[0].SrcBlend = map_blend_factor(pd->blend.src_rgb);
-    bd.RenderTarget[0].DestBlend = map_blend_factor(pd->blend.dst_rgb);
-    bd.RenderTarget[0].BlendOp = map_blend_op(pd->blend.op_rgb);
-    bd.RenderTarget[0].SrcBlendAlpha = map_blend_factor(pd->blend.src_a);
-    bd.RenderTarget[0].DestBlendAlpha = map_blend_factor(pd->blend.dst_a);
-    bd.RenderTarget[0].BlendOpAlpha = map_blend_op(pd->blend.op_a);
-    bd.RenderTarget[0].RenderTargetWriteMask = pd->blend.write_mask ? pd->blend.write_mask : 0x0F;
-
-    hr = ID3D11Device_CreateBlendState(d->st->dev, &bd, &p->p.bs);
-    if (FAILED(hr)) {
-        dx11_destroy_pipeline(d, p);
-        return NULL;
+        hr = ID3D11Device_CreateBlendState(d->st->dev, &bd, &p->p.bs);
+        if (FAILED(hr)) {
+            dx11_destroy_pipeline(d, p);
+            return NULL;
+        }
     }
 
     D3D11_DEPTH_STENCIL_DESC dd = {0};
@@ -1126,7 +1122,9 @@ static void dx11_cmd_end_render(rhi_cmd_t *c) {
 }
 
 static void dx11_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {
-    ID3D11DeviceContext_IASetInputLayout(c->st->ctx, p->p.il);
+    if (p->p.il) {
+        ID3D11DeviceContext_IASetInputLayout(c->st->ctx, p->p.il);
+    }
     ID3D11DeviceContext_VSSetShader(c->st->ctx, p->p.sh->sh.vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(c->st->ctx, p->p.sh->sh.ps, NULL, 0);
     ID3D11DeviceContext_IASetPrimitiveTopology(c->st->ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
