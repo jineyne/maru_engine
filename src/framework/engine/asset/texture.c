@@ -74,7 +74,7 @@ texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *o
     memset(&td, 0, sizeof(td));
     td.width = w;
     td.height = h;
-    td.mip_levels = opts.gen_mips ? 0 : 1;
+    td.mip_levels = opts.gen_mips ? 1 : 0;
     td.format = RHI_FMT_RGBA8;
     td.usage = RHI_TEX_USAGE_SAMPLED | (opts.gen_mips ? RHI_TEX_USAGE_GEN_MIPS : 0);
 

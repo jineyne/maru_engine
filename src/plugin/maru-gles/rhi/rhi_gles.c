@@ -43,7 +43,7 @@ struct rhi_render_target {
 };
 
 struct rhi_cmd {
-    int dummy;
+    rhi_render_target_t *current_rt;
 };
 
 struct rhi_fence {
@@ -99,7 +99,7 @@ static void gl_apply_states(const rhi_pipeline_desc_t *s) {
 static rhi_device_t *gles_create_device(const rhi_device_desc_t *d) {
     INFO("creating OpenGL ES device");
     UNUSED(d);
-    return (rhi_device_t*)calloc(1, sizeof(rhi_device_t));
+    return (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
 }
 
 static void gles_destroy_device(rhi_device_t *d) {
@@ -108,7 +108,7 @@ static void gles_destroy_device(rhi_device_t *d) {
 
 static rhi_swapchain_t *gles_get_swapchain(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_swapchain_t*)calloc(1, sizeof(rhi_swapchain_t));
+    return (rhi_swapchain_t*) calloc(1, sizeof(rhi_swapchain_t));
 }
 
 static void gles_present(rhi_swapchain_t *s) {
@@ -125,7 +125,7 @@ static rhi_buffer_t *gles_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     UNUSED(d);
     UNUSED(desc);
     UNUSED(initial);
-    return (rhi_buffer_t*)calloc(1, sizeof(rhi_buffer_t));
+    return (rhi_buffer_t*) calloc(1, sizeof(rhi_buffer_t));
 }
 
 static void gles_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
@@ -143,7 +143,7 @@ static void gles_update_buffer(rhi_device_t *d, rhi_buffer_t *b, const void *dat
 static rhi_texture_t *gles_create_texture(rhi_device_t *d, const rhi_texture_desc_t *desc, const void *initial) {
     UNUSED(d);
     UNUSED(initial);
-    rhi_texture_t *t = (rhi_texture_t*)calloc(1, sizeof(*t));
+    rhi_texture_t *t = (rhi_texture_t*) calloc(1, sizeof(*t));
     glGenTextures(1, &t->id);
     t->target = GL_TEXTURE_2D;
     t->w = desc->width;
@@ -186,7 +186,7 @@ static void gles_destroy_texture(rhi_device_t *d, rhi_texture_t *t) {
 static rhi_sampler_t *gles_create_sampler(rhi_device_t *d, const rhi_sampler_desc_t *desc) {
     UNUSED(d);
     UNUSED(desc);
-    rhi_sampler_t *s = (rhi_sampler_t*)calloc(1, sizeof(rhi_sampler_t));
+    rhi_sampler_t *s = (rhi_sampler_t*) calloc(1, sizeof(rhi_sampler_t));
     if (!s) return NULL;
     s->_dummy = 1;
     return s;
@@ -202,7 +202,7 @@ static void gles_destroy_sampler(rhi_device_t *d, rhi_sampler_t *s) {
 static rhi_shader_t *gles_create_shader(rhi_device_t *d, const rhi_shader_desc_t *sd) {
     UNUSED(d);
     UNUSED(sd);
-    return (rhi_shader_t*)calloc(1, sizeof(rhi_shader_t));
+    return (rhi_shader_t*) calloc(1, sizeof(rhi_shader_t));
 }
 
 static void gles_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
@@ -212,7 +212,7 @@ static void gles_destroy_shader(rhi_device_t *d, rhi_shader_t *s) {
 
 static rhi_pipeline_t *gles_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     UNUSED(d);
-    rhi_pipeline_t *p = (rhi_pipeline_t*)calloc(1, sizeof(rhi_pipeline_t));
+    rhi_pipeline_t *p = (rhi_pipeline_t*) calloc(1, sizeof(rhi_pipeline_t));
     p->sh = pd->shader;
     return p;
 }
@@ -224,7 +224,7 @@ static void gles_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p) {
 
 static rhi_render_target_t *gles_create_render_target(rhi_device_t *d, const rhi_render_target_desc_t *desc) {
     UNUSED(d);
-    rhi_render_target_t *rt = (rhi_render_target_t*)calloc(1, sizeof(*rt));
+    rhi_render_target_t *rt = (rhi_render_target_t*) calloc(1, sizeof(*rt));
     glGenFramebuffers(1, &rt->fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, rt->fbo);
 
@@ -277,7 +277,7 @@ static rhi_render_target_t *gles_get_backbuffer_rt(rhi_device_t *d) {
     UNUSED(d);
     static rhi_render_target_t *s = NULL;
     if (!s) {
-        s = (rhi_render_target_t*)calloc(1, sizeof(*s));
+        s = (rhi_render_target_t*) calloc(1, sizeof(*s));
         s->is_backbuffer = 1;
     }
     return s;
@@ -291,18 +291,41 @@ static rhi_texture_t *gles_render_target_get_color_tex(rhi_render_target_t *rt, 
 
 static rhi_cmd_t *gles_begin_cmd(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_cmd_t*)calloc(1, sizeof(rhi_cmd_t));
+    rhi_cmd_t *c = (rhi_cmd_t*) calloc(1, sizeof(rhi_cmd_t));
+    if (c) c->current_rt = NULL;
+    return c;
 }
 
 static void gles_end_cmd(rhi_cmd_t *c) { free(c); }
 
 static void gles_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const float clear_rgba[4]) {
-    UNUSED(c);
     rhi_render_target_t *use = rt ? rt : gles_get_backbuffer_rt(NULL);
+    c->current_rt = use;
     glBindFramebuffer(GL_FRAMEBUFFER, use->fbo);
 
+    GLint vpw = 0, vph = 0;
+    if (use->is_backbuffer) {
+        GLint vp[4] = {0, 0, 0, 0};
+        glGetIntegerv(GL_VIEWPORT, vp);
+        vpw = vp[2];
+        vph = vp[3];
+    } else if (use->color_count > 0 && use->color_ids[0]) {
+        GLint w = 0, h = 0;
+        glBindTexture(GL_TEXTURE_2D, use->color_ids[0]);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        vpw = w;
+        vph = h;
+    }
+
+    if (vpw <= 0 || vph <= 0) {
+        vpw = 1280;
+        vph = 720;
+    }
+    glViewport(0, 0, vpw, vph);
+
     if (clear_rgba) {
-        glViewport(0, 0, /* TODO: real size */ 4096, 4096);
         glClearColor(clear_rgba[0], clear_rgba[1], clear_rgba[2], clear_rgba[3]);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     }
@@ -326,14 +349,11 @@ static void gles_cmd_bind_const_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b, 
 
 static void gles_cmd_bind_texture(rhi_cmd_t *c, rhi_texture_t *t, int slot, uint32_t stages) {
     UNUSED(stages);
-    static rhi_render_target_t *s_last_rt = NULL;
-
     if (!t || !t->id) return;
-    if (gl_srv_conflicts_with_rt(t->id, s_last_rt)) {
+    if (gl_srv_conflicts_with_rt(t->id, c ? c->current_rt : NULL)) {
         DEBUG_LOG("GL: SRV-RT conflict on unit %u -> skip bind", slot);
         return;
     }
-
     glActiveTexture(GL_TEXTURE0 + slot);
     glBindTexture(t->target, t->id);
 }
@@ -392,7 +412,7 @@ static void gles_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t fir
 
 static rhi_fence_t *gles_fence_create(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_fence_t*)calloc(1, sizeof(rhi_fence_t));
+    return (rhi_fence_t*) calloc(1, sizeof(rhi_fence_t));
 }
 
 static void gles_fence_wait(rhi_fence_t *f) { UNUSED(f); }

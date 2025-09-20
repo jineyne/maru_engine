@@ -94,6 +94,7 @@ struct rhi_render_target {
 
 struct rhi_cmd {
     dx11_state_t *st;
+    dx11_rt_t *current_rt;
 };
 
 struct rhi_fence {
@@ -139,8 +140,8 @@ static int dx11_rt_create_depth(dx11_state_t *st, dx11_rt_t *rt, int w, int h) {
     dx11_rt_release_depth(rt);
 
     D3D11_TEXTURE2D_DESC td = {0};
-    td.Width = (UINT)w;
-    td.Height = (UINT)h;
+    td.Width = (UINT) w;
+    td.Height = (UINT) h;
     td.MipLevels = 1;
     td.ArraySize = 1;
     td.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -171,7 +172,7 @@ static int dx11_create_backbuffer_rtv(dx11_state_t *st) {
 static void dx11_refresh_backbuffer_rt(dx11_state_t *st) {
     if (!st || !st->rtv) return;
     if (!st->back_rt) {
-        st->back_rt = (rhi_render_target_t*)calloc(1, sizeof(rhi_render_target_t));
+        st->back_rt = (rhi_render_target_t*) calloc(1, sizeof(rhi_render_target_t));
     }
 
     dx11_rt_t *rt = &st->back_rt->rt;
@@ -357,10 +358,10 @@ static UINT mip_count_from_wh(UINT w, UINT h) {
 static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
     if (!desc || !desc->native_window) return NULL;
 
-    dx11_state_t *st = (dx11_state_t*)calloc(1, sizeof(dx11_state_t));
+    dx11_state_t *st = (dx11_state_t*) calloc(1, sizeof(dx11_state_t));
     if (!st) return NULL;
 
-    st->hwnd = (HWND)desc->native_window;
+    st->hwnd = (HWND) desc->native_window;
     st->w = (desc->width > 0) ? desc->width : 1280;
     st->h = (desc->height > 0) ? desc->height : 720;
     st->vsync = desc->vsync ? 1 : 0;
@@ -404,7 +405,7 @@ static rhi_device_t *dx11_create_device(const rhi_device_desc_t *desc) {
 
     dx11_refresh_backbuffer_rt(st);
 
-    rhi_device_t *dev = (rhi_device_t*)calloc(1, sizeof(rhi_device_t));
+    rhi_device_t *dev = (rhi_device_t*) calloc(1, sizeof(rhi_device_t));
     if (!dev) {
         dx11_release_all(st);
         free(st);
@@ -427,7 +428,7 @@ static void dx11_destroy_device(rhi_device_t *d) {
 
 static rhi_swapchain_t *dx11_get_swapchain(rhi_device_t *desc) {
     if (!desc || !desc->st) return NULL;
-    rhi_swapchain_t *s = (rhi_swapchain_t*)calloc(1, sizeof(rhi_swapchain_t));
+    rhi_swapchain_t *s = (rhi_swapchain_t*) calloc(1, sizeof(rhi_swapchain_t));
     if (!s) return NULL;
     s->st = desc->st;
     return s;
@@ -477,7 +478,7 @@ static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     if (!d || !d->st || !desc || desc->size == 0) return NULL;
 
     D3D11_BUFFER_DESC bd = {0};
-    bd.ByteWidth = (UINT)ALIGN_UP(desc->size, 16);
+    bd.ByteWidth = (UINT) ALIGN_UP(desc->size, 16);
     bd.Usage = D3D11_USAGE_DEFAULT;
 
     bd.BindFlags = 0;
@@ -543,12 +544,13 @@ static void dx11_destroy_buffer(rhi_device_t *d, rhi_buffer_t *b) {
 static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_desc_t *desc, const void *initial) {
     UNUSED(initial);
 
-    dx11_state_t *st = ((struct rhi_device*)d)->st;
+    dx11_state_t *st = ((struct rhi_device*) d)->st;
     HRESULT hr = S_OK;
 
     const bool wantSRV = (desc->usage & RHI_TEX_USAGE_SAMPLED) != 0;
     const bool wantRTV = (desc->usage & RHI_TEX_USAGE_RENDER_TARGET) != 0;
     const bool wantDSV = (desc->usage & RHI_TEX_USAGE_DEPTH) != 0;
+    const bool want_gen_mips = (desc->usage & RHI_TEX_USAGE_GEN_MIPS) != 0;
 
     DXGI_FORMAT base_fmt = DXGI_FORMAT_UNKNOWN;
     DXGI_FORMAT srv_fmt = DXGI_FORMAT_UNKNOWN;
@@ -571,7 +573,7 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
     }
 
 
-    rhi_texture_t *tex = (rhi_texture_t*)calloc(1, sizeof(*tex));
+    rhi_texture_t *tex = (rhi_texture_t*) calloc(1, sizeof(*tex));
     if (!tex) return NULL;
 
     D3D11_TEXTURE2D_DESC td = {0};
@@ -586,16 +588,16 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
     if (wantSRV) td.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
     if (wantDSV) td.BindFlags |= D3D11_BIND_DEPTH_STENCIL;
 
+    bool use_auto_gen_mips = (!wantDSV) && wantSRV && want_gen_mips && (desc->mip_levels == 0);
+    if (use_auto_gen_mips) {
+        td.MipLevels = mip_count_from_wh(td.Width, td.Height);
+        td.MiscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+    }
+
     const D3D11_SUBRESOURCE_DATA *init_data = NULL;
     D3D11_SUBRESOURCE_DATA *subs = NULL;
 
-    if (initial) {
-        UINT mip_count = td.MipLevels;
-        /*if (desc->mip_levels == 0 && wantSRV && !wantDSV) {
-            mipCount = mip_count_from_wh(td.Width, td.Height);
-            td.MipLevels = mipCount;
-        }*/
-
+    if (initial && !use_auto_gen_mips) {
         const size_t bpp = bytes_per_pixel_dxgi(base_fmt);
         if (bpp == 0) {
             MR_LOG(ERROR, "Unsupported initial-data format for DXGI format %d", (int)base_fmt);
@@ -603,18 +605,19 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
             return NULL;
         }
 
-        subs = (D3D11_SUBRESOURCE_DATA*)malloc(sizeof(D3D11_SUBRESOURCE_DATA) * mip_count);
+        UINT mip_count = td.MipLevels;
+        subs = (D3D11_SUBRESOURCE_DATA*) malloc(sizeof(D3D11_SUBRESOURCE_DATA) * mip_count);
         if (!subs) {
             free(tex);
             return NULL;
         }
 
-        const uint8_t *src = (const uint8_t*)initial;
+        const uint8_t *src = (const uint8_t*) initial;
         UINT w = td.Width, h = td.Height;
         for (UINT i = 0; i < mip_count; ++i) {
             UINT rw = w ? w : 1;
             UINT rh = h ? h : 1;
-            UINT rowPitch = (UINT)(rw * bpp);
+            UINT rowPitch = (UINT) (rw * bpp);
             UINT slicePitch = rowPitch * rh;
 
             subs[i].pSysMem = src;
@@ -676,6 +679,19 @@ static rhi_texture_t *dx11_create_texture(rhi_device_t *d, const rhi_texture_des
         if (FAILED(hr)) {
             MR_LOG(ERROR, "CreateDSV failed 0x%08X", hr);
             goto fail;
+        }
+    }
+
+    if (use_auto_gen_mips && initial) {
+        const size_t bpp = bytes_per_pixel_dxgi(base_fmt);
+        if (bpp == 0) {
+            MR_LOG(ERROR, "gen_mips: unsupported bpp");
+            goto fail;
+        }
+        UINT rowPitch = (UINT) (td.Width * bpp);
+        ID3D11DeviceContext_UpdateSubresource(st->ctx, (ID3D11Resource *)tex->t.tex, 0, NULL, initial, rowPitch, 0);
+        if (tex->t.srv) {
+            ID3D11DeviceContext_GenerateMips(st->ctx, tex->t.srv);
         }
     }
 
@@ -754,7 +770,7 @@ static rhi_sampler_t *dx11_create_sampler(rhi_device_t *d, const rhi_sampler_des
     HRESULT hr = ID3D11Device_CreateSamplerState(d->st->dev, &sd, &state);
     if (FAILED(hr)) return NULL;
 
-    rhi_sampler_t *s = (rhi_sampler_t*)calloc(1, sizeof(rhi_sampler_t));
+    rhi_sampler_t *s = (rhi_sampler_t*) calloc(1, sizeof(rhi_sampler_t));
     s->state = state;
     return s;
 }
@@ -774,8 +790,8 @@ static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t
     HRESULT hr = D3DCompile(sd->blob_vs, sd->blob_vs_size, "vs", NULL, NULL, sd->entry_vs, "vs_5_0", 0, 0, &vsb, &err);
     if (FAILED(hr)) {
         if (err) {
-            const char *msg = (const char*)ID3D10Blob_GetBufferPointer(err);
-            size_t mlen = (size_t)ID3D10Blob_GetBufferSize(err);
+            const char *msg = (const char*) ID3D10Blob_GetBufferPointer(err);
+            size_t mlen = (size_t) ID3D10Blob_GetBufferSize(err);
             INFO("HLSL VS compile error:\n%.*s", (int)mlen, msg);
             ID3D10Blob_Release(err);
         }
@@ -786,8 +802,8 @@ static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t
     if (FAILED(hr)) {
         ID3D10Blob_Release(vsb);
         if (err) {
-            const char *msg = (const char*)ID3D10Blob_GetBufferPointer(err);
-            size_t mlen = (size_t)ID3D10Blob_GetBufferSize(err);
+            const char *msg = (const char*) ID3D10Blob_GetBufferPointer(err);
+            size_t mlen = (size_t) ID3D10Blob_GetBufferSize(err);
             INFO("HLSL PS compile error:\n%.*s", (int)mlen, msg);
             ID3D10Blob_Release(err);
         }
@@ -812,7 +828,7 @@ static rhi_shader_t *dx11_create_shader(rhi_device_t *d, const rhi_shader_desc_t
         return NULL;
     }
 
-    rhi_shader_t *sh = (rhi_shader_t*)calloc(1, sizeof(rhi_shader_t));
+    rhi_shader_t *sh = (rhi_shader_t*) calloc(1, sizeof(rhi_shader_t));
     sh->sh.vs = vs;
     sh->sh.ps = ps;
     sh->sh.vs_blob = vsb;
@@ -844,7 +860,7 @@ static void dx11_destroy_pipeline(rhi_device_t *d, rhi_pipeline_t *p);
 static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_desc_t *pd) {
     if (!d || !pd || !pd->shader) return NULL;
 
-    rhi_pipeline_t *p = (rhi_pipeline_t*)calloc(1, sizeof(rhi_pipeline_t));
+    rhi_pipeline_t *p = (rhi_pipeline_t*) calloc(1, sizeof(rhi_pipeline_t));
     p->p.sh = pd->shader;
 
     D3D11_INPUT_ELEMENT_DESC il[32];
@@ -861,13 +877,12 @@ static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_
             .InstanceDataStepRate = 0,
         };
     }
+
     if (il_count == 0) {
-        D3D11_INPUT_ELEMENT_DESC fallback[2] = {
-            {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-            {"COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, (UINT)(sizeof(float) * 3), D3D11_INPUT_PER_VERTEX_DATA, 0},
-        };
-        memcpy(il, fallback, sizeof(fallback));
-        il_count = 2;
+        FATAL("DX11: pipeline requires at least one vertex attribute");
+
+        free(p);
+        return NULL;
     }
 
     HRESULT hr = ID3D11Device_CreateInputLayout(
@@ -875,6 +890,7 @@ static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_
         ID3D10Blob_GetBufferPointer(p->p.sh->sh.vs_blob),
         (SIZE_T)ID3D10Blob_GetBufferSize(p->p.sh->sh.vs_blob),
         &p->p.il);
+
     if (FAILED(hr)) {
         free(p);
         return NULL;
@@ -914,7 +930,7 @@ static rhi_pipeline_t *dx11_create_pipeline(rhi_device_t *d, const rhi_pipeline_
                       ? D3D11_CULL_FRONT
                       : D3D11_CULL_BACK;
     rd.FrontCounterClockwise = pd->raster.front_ccw ? TRUE : FALSE;
-    rd.DepthBias = (INT)pd->raster.depth_bias;
+    rd.DepthBias = (INT) pd->raster.depth_bias;
     rd.SlopeScaledDepthBias = pd->raster.slope_scaled_depth_bias;
     rd.DepthClipEnable = TRUE;
 
@@ -953,7 +969,7 @@ static rhi_render_target_t *dx11_create_render_target(rhi_device_t *d, const rhi
     if (!d || !d->st || !desc) return NULL;
     dx11_state_t *st = d->st;
 
-    rhi_render_target_t *rt = (rhi_render_target_t*)calloc(1, sizeof(*rt));
+    rhi_render_target_t *rt = (rhi_render_target_t*) calloc(1, sizeof(*rt));
     dx11_rt_t *dxrt = &rt->rt;
     dxrt->st = st;
     dxrt->is_backbuffer = 0;
@@ -1018,14 +1034,45 @@ static rhi_texture_t *dx11_render_target_get_color_tex(rhi_render_target_t *rt, 
 }
 
 static rhi_cmd_t *dx11_begin_cmd(rhi_device_t *d) {
-    rhi_cmd_t *c = (rhi_cmd_t*)calloc(1, sizeof(rhi_cmd_t));
+    rhi_cmd_t *c = (rhi_cmd_t*) calloc(1, sizeof(rhi_cmd_t));
     if (!c) return NULL;
     c->st = d->st;
+    c->current_rt = NULL;
     return c;
 }
 
 static void dx11_end_cmd(rhi_cmd_t *c) {
     free(c);
+}
+
+static void dx11_get_rt_size(dx11_rt_t *rt, int *out_w, int *out_h) {
+    if (!rt || !out_w || !out_h) return;
+    *out_w = 0;
+    *out_h = 0;
+
+    if (rt->is_backbuffer) {
+        if (rt->st) {
+            *out_w = rt->st->w;
+            *out_h = rt->st->h;
+        }
+        return;
+    }
+
+    if (rt->color_count > 0 && rt->rtvs[0]) {
+        ID3D11Resource *res = NULL;
+        ID3D11RenderTargetView_GetResource(rt->rtvs[0], &res);
+        if (res) {
+            ID3D11Texture2D *tex = NULL;
+            if (SUCCEEDED(ID3D11Resource_QueryInterface(res, &IID_ID3D11Texture2D, (void **)&tex)) && tex) {
+                D3D11_TEXTURE2D_DESC td;
+                ID3D11Texture2D_GetDesc(tex, &td);
+                *out_w = (int) td.Width;
+                *out_h = (int) td.Height;
+                ID3D11Texture2D_Release(tex);
+            }
+            ID3D11Resource_Release(res);
+        }
+    }
 }
 
 static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const float clear_rgba[4]) {
@@ -1042,6 +1089,8 @@ static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const f
         if (!use_rt || !use_rt->rt.color_count || !use_rt->rt.rtvs[0]) return;
     }
 
+    c->current_rt = &use_rt->rt;
+
     ID3D11RenderTargetView *rtv = use_rt->rt.rtvs[0];
     ID3D11DepthStencilView *dsv = use_rt->rt.dsv;
     ID3D11DeviceContext_OMSetRenderTargets(st->ctx, 1, &rtv, dsv);
@@ -1049,8 +1098,8 @@ static void dx11_cmd_begin_render(rhi_cmd_t *c, rhi_render_target_t *rt, const f
     D3D11_VIEWPORT vp = {0};
     vp.TopLeftX = 0.0f;
     vp.TopLeftY = 0.0f;
-    vp.Width = (FLOAT)st->w;
-    vp.Height = (FLOAT)st->h;
+    vp.Width = (FLOAT) st->w;
+    vp.Height = (FLOAT) st->h;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     ID3D11DeviceContext_RSSetViewports(st->ctx, 1, &vp);
@@ -1072,6 +1121,8 @@ static void dx11_cmd_end_render(rhi_cmd_t *c) {
 
     dx11_unbind_all_srvs(c->st);
     dx11_unbind_all_samplers(c->st);
+
+    c->current_rt = NULL;
 }
 
 static void dx11_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {
@@ -1100,11 +1151,9 @@ static void dx11_cmd_bind_texture(rhi_cmd_t *c, rhi_texture_t *t, int slot, uint
     if (!c || !c->st) return;
 
     dx11_state_t *st = c->st;
-    dx11_rt_t *cur = (st->back_rt ? &st->back_rt->rt : NULL);
 
     ID3D11ShaderResourceView *srv = t->t.srv;
-
-    if (cur && dx11_srv_conflicts_with_rt(srv, cur)) {
+    if (c->current_rt && dx11_srv_conflicts_with_rt(srv, c->current_rt)) {
         DEBUG_LOG("DX11: SRV-RTV conflict on slot %u -> skip", slot);
         return;
     }
@@ -1140,10 +1189,10 @@ static void dx11_cmd_set_viewport_scissor(rhi_cmd_t *c, int x, int y, int w, int
 
     dx11_state_t *st = c->st;
     D3D11_VIEWPORT vp;
-    vp.TopLeftX = (FLOAT)x;
-    vp.TopLeftY = (FLOAT)y;
-    vp.Width = (FLOAT)w;
-    vp.Height = (FLOAT)h;
+    vp.TopLeftX = (FLOAT) x;
+    vp.TopLeftY = (FLOAT) y;
+    vp.Width = (FLOAT) w;
+    vp.Height = (FLOAT) h;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     ID3D11DeviceContext_RSSetViewports(st->ctx, 1, &vp);
@@ -1166,8 +1215,6 @@ static void dx11_cmd_set_depth_bias(rhi_cmd_t *c, float constant, float slope_sc
 }
 
 static void dx11_cmd_set_vertex_buffer(rhi_cmd_t *c, int slot, rhi_buffer_t *b) {
-    b->vb.stride = sizeof(float) * 6;
-    b->vb.offset = 0;
     ID3D11Buffer *buf = b->vb.buf;
     ID3D11DeviceContext_IASetVertexBuffers(c->st->ctx, (UINT)slot, 1, &buf, &b->vb.stride, &b->vb.offset);
 }
@@ -1195,7 +1242,7 @@ static void dx11_cmd_draw_indexed(rhi_cmd_t *c, uint32_t idx_count, uint32_t fir
 
 static rhi_fence_t *dx11_fence_create(rhi_device_t *d) {
     UNUSED(d);
-    return (rhi_fence_t*)calloc(1, sizeof(rhi_fence_t));
+    return (rhi_fence_t*) calloc(1, sizeof(rhi_fence_t));
 }
 
 static void dx11_fence_wait(rhi_fence_t *f) {
@@ -1207,7 +1254,7 @@ static void dx11_fence_destroy(rhi_fence_t *f) {
 }
 
 static void dx11_get_capabilities(rhi_device_t *dev, rhi_capabilities_t *out) {
-    (void)dev;
+    (void) dev;
     out->min_depth = 0.0f;
     out->max_depth = 1.0f;
     out->conventions.uv_yaxis = RHI_AXIS_DOWN;
