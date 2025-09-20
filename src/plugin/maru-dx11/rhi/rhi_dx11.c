@@ -1122,9 +1122,7 @@ static void dx11_cmd_end_render(rhi_cmd_t *c) {
 }
 
 static void dx11_cmd_bind_pipeline(rhi_cmd_t *c, rhi_pipeline_t *p) {
-    if (p->p.il) {
-        ID3D11DeviceContext_IASetInputLayout(c->st->ctx, p->p.il);
-    }
+    ID3D11DeviceContext_IASetInputLayout(c->st->ctx, p->p.il);
     ID3D11DeviceContext_VSSetShader(c->st->ctx, p->p.sh->sh.vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(c->st->ctx, p->p.sh->sh.ps, NULL, 0);
     ID3D11DeviceContext_IASetPrimitiveTopology(c->st->ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

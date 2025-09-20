@@ -15,6 +15,29 @@
 #include "math/proj.h"
 #include "platform/window.h"
 
+#include "time.h"
+
+typedef struct boot_prof_s {
+    uint64_t t0;
+    uint64_t last;
+} boot_prof_t;
+
+static inline boot_prof_t boot_prof_begin(void) {
+    uint64_t now = time_now_ms();
+    return (boot_prof_t){.t0 = now, .last = now};
+}
+
+static inline void boot_prof_step(boot_prof_t *p, const char *tag) {
+    uint64_t now = time_now_ms();
+    INFO("[boot] %-22s : %4llu ms", tag, (unsigned long long)(now - p->last));
+    p->last = now;
+}
+
+static inline void boot_prof_total(boot_prof_t *p) {
+    uint64_t now = time_now_ms();
+    INFO("[boot] %-22s : %4llu ms", "TOTAL INIT", (unsigned long long)(now - p->t0));
+}
+
 engine_context_t g_ctx;
 
 static int initialized = 0;
@@ -45,7 +68,7 @@ static void update_mvp_from_size(int w, int h) {
     rhi->get_capabilities(g_ctx.active_device, &caps);
 
     if (h <= 0) h = 1;
-    float aspect = (float)w / (float)h;
+    float aspect = (float) w / (float) h;
 
     mat4_t P, V, M, R, PV, MVP;
     perspective_from_caps(&caps, 60.0f * (PI / 180.0f), aspect, 0.1f, 100.0f, P);
@@ -83,9 +106,9 @@ static void create_triangle_resources(void) {
 
     float vtx[] = {
         //          position             color     uv
-        /* top   */  0.0f,  0.5f, 0.0f,  1, 0, 0,  0.5f, 0.0f,
-        /* right */  0.5f, -0.5f, 0.0f,  0, 0, 1,  1.0f, 1.0f,
-        /* left  */ -0.5f, -0.5f, 0.0f,  0, 1, 0,  0.0f, 1.0f,
+        /* top   */ 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
+        /* right */ 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
+        /* left  */ -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
     };
     rhi_buffer_desc_t bd = {0};
     bd.size = sizeof(vtx);
@@ -121,12 +144,12 @@ static void create_triangle_resources(void) {
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
-        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
+        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 3)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 6)},
     };
     pd.layout.attrs = attrs;
     pd.layout.attr_count = 3;
-    pd.layout.stride[0] = (uint32_t)(sizeof(float) * 8);
+    pd.layout.stride[0] = (uint32_t) (sizeof(float) * 8);
 
     pd.raster.fill = RHI_FILL_SOLID;
     pd.raster.cull = RHI_CULL_BACK;
@@ -194,6 +217,8 @@ static const rhi_backend map_backend_to_backend_key(const char *backend) {
 }
 
 int maru_engine_init(const char *config_path) {
+    boot_prof_t prof = boot_prof_begin();
+
     if (initialized) {
         return MARU_OK;
     }
@@ -201,6 +226,7 @@ int maru_engine_init(const char *config_path) {
     INFO("maru init");
 
     asset_init(NULL);
+    boot_prof_step(&prof, "asset_init");
 
     maru_config_t cfg = {0};
     if (config_load(config_path, &cfg) != MARU_OK) {
@@ -208,12 +234,16 @@ int maru_engine_init(const char *config_path) {
         return MARU_ERR_PARSE;
     }
 
+    boot_prof_step(&prof, "config_load");
+
     engine_context_init(&g_ctx);
+    boot_prof_step(&prof, "engine_context_init");
 
     engine_context_load_rhi(&g_ctx, "maru-gl", "gl");
 #if defined(_WIN32)
     engine_context_load_rhi(&g_ctx, "maru-dx11", "dx11");
 #endif
+    boot_prof_step(&prof, "register_rhi_backends");
 
     const char *want = map_backend_to_regname(cfg.graphics_backend);
 
@@ -227,6 +257,7 @@ int maru_engine_init(const char *config_path) {
         engine_context_shutdown(&g_ctx);
         return MARU_ERR_INVALID;
     }
+    boot_prof_step(&prof, "window_create");
 
     rhi_device_desc_t device_desc = (rhi_device_desc_t){0};
     device_desc.backend = map_backend_to_backend_key(want);
@@ -246,18 +277,25 @@ int maru_engine_init(const char *config_path) {
             return MARU_ERR_INVALID;
         }
     }
+    boot_prof_step(&prof, "rhi_select+device_create");
 
     g_swapchain = g_ctx.active_rhi->get_swapchain(g_ctx.active_device);
     g_back_rt = g_ctx.active_rhi->get_backbuffer_rt(g_ctx.active_device);
+    boot_prof_step(&prof, "swapchain+backbuffer");
 
     create_triangle_resources();
+    boot_prof_step(&prof, "create_triangle_resources");
 
     int cw = 0, ch = 0;
     platform_window_get_size(g_ctx.window, &cw, &ch);
     renderer_init(&g_renderer, g_ctx.active_rhi, g_ctx.active_device, cw, ch);
+    boot_prof_step(&prof, "renderer_init");
+
     renderer_set_scene(&g_renderer, record_scene, NULL);
+    boot_prof_step(&prof, "renderer_set_scene");
 
     config_free(&cfg);
+    boot_prof_total(&prof);
 
     initialized = 1;
     return MARU_OK;
