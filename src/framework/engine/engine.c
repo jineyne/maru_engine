@@ -39,7 +39,7 @@ static void update_mvp_from_size(int w, int h) {
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
     static float s_angle = 0.0f;
-    s_angle += 0.8f * (3.14159265f / 180.0f);
+    s_angle += 0.8f * (PI / 180.0f);
 
     rhi_capabilities_t caps;
     rhi->get_capabilities(g_ctx.active_device, &caps);
@@ -48,7 +48,7 @@ static void update_mvp_from_size(int w, int h) {
     float aspect = (float)w / (float)h;
 
     mat4_t P, V, M, R, PV, MVP;
-    perspective_from_caps(&caps, 60.0f * (3.14159265f / 180.0f), aspect, 0.1f, 100.0f, P);
+    perspective_from_caps(&caps, 60.0f * (PI / 180.0f), aspect, 0.1f, 100.0f, P);
 
     vec3_t eye = {0.f, 0.f, 2.5f};
     vec3_t at = {0.f, 0.f, 0.f};
@@ -59,6 +59,7 @@ static void update_mvp_from_size(int w, int h) {
     glm_rotate_y(M, s_angle, R);
     mat4_mul(P, V, PV);
     mat4_mul(PV, R, MVP);
+    mat4_to_backend_order(&caps, MVP, MVP);
 
     rhi->update_buffer(g_ctx.active_device, g_mvp_cb, &MVP, sizeof(MVP));
 }
@@ -89,6 +90,7 @@ static void create_triangle_resources(void) {
     rhi_buffer_desc_t bd = {0};
     bd.size = sizeof(vtx);
     bd.usage = RHI_BUF_VERTEX;
+    bd.stride = sizeof(float) * 8;
     g_triangle_vb = rhi->create_buffer(g_ctx.active_device, &bd, vtx);
 
     uint32_t idx[] = {0, 1, 2};

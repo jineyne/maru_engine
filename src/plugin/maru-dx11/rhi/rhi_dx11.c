@@ -504,10 +504,10 @@ static rhi_buffer_t *dx11_create_buffer(rhi_device_t *d, const rhi_buffer_desc_t
     HRESULT hr = ID3D11Device_CreateBuffer(d->st->dev, &bd, initial ? &srd : NULL, &buf);
     if (FAILED(hr)) return NULL;
 
-    rhi_buffer_t *b = (rhi_buffer_t*)calloc(1, sizeof(rhi_buffer_t));
+    rhi_buffer_t *b = (rhi_buffer_t*) calloc(1, sizeof(rhi_buffer_t));
     b->vb.buf = buf;
     b->vb.size = desc->size;
-    b->vb.stride = 0;
+    b->vb.stride = desc->stride;
     b->vb.offset = 0;
     return b;
 }

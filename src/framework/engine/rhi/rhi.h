@@ -143,6 +143,8 @@ typedef struct rhi_buffer_desc {
     size_t size;
     uint32_t usage; /* user-defined flags */
     uint32_t cpu; /* CPU access flags */
+
+    size_t stride; /* for vertex buffer */
 } rhi_buffer_desc_t;
 
 typedef struct rhi_texture_desc {
