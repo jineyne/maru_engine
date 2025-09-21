@@ -37,15 +37,6 @@ static inline uint32_t get_handle_gen(handle_t h) {
     return (h >> GEN_SHIFT) & 0xFFu;
 }
 
-static inline handle_t make_handle(uint32_t idx, uint8_t gen) {
-    handle_t v = (((handle_t) gen) << GEN_SHIFT) | (idx & IDX_MASK);
-    if (v == HANDLE_INVALID) {
-        ++v;
-    }
-
-    return v;
-}
-
 static inline slot_hdr_t *slot_hdr_at(const handle_pool_t *hp, uint32_t idx) {
     return (slot_hdr_t*) (hp->blob + (hp->obj_size + sizeof(slot_hdr_t)) * (size_t) idx);
 }
@@ -226,4 +217,13 @@ size_t handle_pool_capacity(handle_pool_t *hp) {
 
 size_t handle_pool_alive_count(handle_pool_t *hp) {
     return hp ? hp->alive : 0;
+}
+
+handle_t make_handle(uint32_t idx, uint8_t gen) {
+    handle_t v = (((handle_t)gen) << GEN_SHIFT) | (idx & IDX_MASK);
+    if (v == HANDLE_INVALID) {
+        ++v;
+    }
+
+    return v;
 }

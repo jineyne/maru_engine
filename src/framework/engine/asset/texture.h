@@ -7,8 +7,6 @@ extern "C" {
 
 #include <stdint.h>
 
-typedef struct rhi_texture rhi_texture_t;
-
 typedef struct texture_t {
     int width;
     int height;

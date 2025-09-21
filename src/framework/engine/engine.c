@@ -3,20 +3,18 @@
 #include "engine_context.h"
 
 #include "config.h"
-#include "plugin/plugin.h"
 #include "rhi/rhi.h"
 #include "renderer/renderer.h"
 
 #include <string.h>
 
 #include "asset/asset.h"
-#include "asset/texture.h"
+#include "asset/texture_manager.h"
 #include "math/math.h"
 #include "math/proj.h"
 #include "platform/window.h"
 
 #include "time.h"
-#include "asset/texture_manager.h"
 #include "mem/mem_diag.h"
 #include "mem/mem_frame.h"
 
@@ -57,7 +55,7 @@ static rhi_pipeline_t *g_triangle_pl = NULL;
 
 static rhi_buffer_t *g_mvp_cb = NULL;
 
-static texture_t *g_texture = NULL;
+static texture_handle_t g_texture = NULL;
 static rhi_sampler_t *g_sampler = NULL;
 
 static void update_mvp_from_size(int w, int h) {
@@ -96,7 +94,10 @@ static void record_scene(rhi_cmd_t *cmd, void *user) {
     rhi->cmd_bind_pipeline(cmd, g_triangle_pl);
     rhi->cmd_bind_const_buffer(cmd, 0, g_mvp_cb, RHI_STAGE_VS);
 
-    rhi->cmd_bind_texture(cmd, g_texture->internal, 0, RHI_STAGE_PS);
+    rhi_texture_t *rt = tex_acquire_rhi(g_texture);
+    if (rt != NULL) {
+        rhi->cmd_bind_texture(cmd, rt, 0, RHI_STAGE_PS);
+    }
     rhi->cmd_bind_sampler(cmd, g_sampler, 0, RHI_STAGE_PS);
 
     rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
@@ -191,7 +192,7 @@ static void create_triangle_resources(void) {
         .flip_y = 0,
         .force_rgba = 1
     };
-    g_texture = asset_load_texture("texture\\karina.jpg", &opts);
+    g_texture = tex_create_from_file("texture\\karina.jpg", &opts);
 
     rhi_sampler_desc_t sampler_desc = {0};
     sampler_desc.min_filter = RHI_FILTER_LINEAR;
@@ -288,7 +289,7 @@ int maru_engine_init(const char *config_path) {
 
     frame_arena_init(8 * 1024 * 1024, 2);
 
-    tex_manager_init(512);
+    texture_manager_init(512);
 
     create_triangle_resources();
     boot_prof_step(&prof, "create_triangle_resources");
@@ -346,9 +347,9 @@ bool maru_engine_tick(void) {
 void maru_engine_shutdown(void) {
     if (!initialized) return;
 
-    asset_free_texture(g_texture);
+    tex_destroy(g_texture);
 
-    tex_manager_shutdown();
+    texture_manager_shutdown();
 
     frame_arena_shutdown();
 
