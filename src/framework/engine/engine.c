@@ -17,6 +17,7 @@
 
 #include "time.h"
 #include "mem/mem_diag.h"
+#include "mem/mem_frame.h"
 
 typedef struct boot_prof_s {
     uint64_t t0;
@@ -298,12 +299,18 @@ int maru_engine_init(const char *config_path) {
     config_free(&cfg);
     boot_prof_total(&prof);
 
+    frame_arena_init(8 * 1024 * 1024, 2);
+
     initialized = 1;
     return MARU_OK;
 }
 
+static size_t frame_count = 0;
 bool maru_engine_tick(void) {
     if (!initialized) return false;
+
+    frame_arena_begin(frame_count++);
+
     if (platform_should_close(g_ctx.window)) return false;
     platform_poll_events();
 
@@ -334,6 +341,8 @@ bool maru_engine_tick(void) {
 
 void maru_engine_shutdown(void) {
     if (!initialized) return;
+
+    frame_arena_shutdown();
 
     asset_free_texture(g_texture);
 
