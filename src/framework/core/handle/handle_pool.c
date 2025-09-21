@@ -16,14 +16,18 @@ struct handle_pool {
     size_t obj_size;
     size_t obj_align;
     size_t stride;
+    size_t obj_off;
     size_t alive;
     uint32_t free_head;
     uint8_t *blob;
 };
 
-
 #define IDX_MASK  ((uint32_t)0x00FFFFFFu)
 #define GEN_SHIFT (24u)
+
+#ifndef ALIGN_UP
+#define ALIGN_UP(_v,_a) ( ((_a) <= 1) ? (_v) : ( ((size_t)(_v) + ((size_t)(_a)-1)) & ~((size_t)(_a)-1) ) )
+#endif
 
 static inline uint32_t get_handle_index(handle_t h) {
     return (h & IDX_MASK);
@@ -46,7 +50,7 @@ static inline slot_hdr_t *slot_hdr_at(const handle_pool_t *hp, uint32_t idx) {
     return (slot_hdr_t*) (hp->blob + (hp->obj_size + sizeof(slot_hdr_t)) * (size_t) idx);
 }
 
-static inline void *slot_obj_at(handle_pool_t *hp, uint32_t idx) {
+static inline void *slot_obj_at(const handle_pool_t *hp, uint32_t idx) {
     return (void*) (hp->blob + (hp->obj_size + sizeof(slot_hdr_t)) * (size_t) idx + sizeof(slot_hdr_t));
 }
 
@@ -71,28 +75,50 @@ static int safe_mul(size_t a, size_t b, size_t *out) {
 }
 
 
-handle_pool_t *handle_pool_create(size_t capacity, size_t obj_size) {
+handle_pool_t *handle_pool_create(size_t capacity, size_t obj_size, size_t obj_align) {
     if (capacity == 0 || obj_size == 0 || capacity > IDX_MASK) return NULL;
+
     handle_pool_t *hp = (handle_pool_t*) MARU_MALLOC(sizeof(*hp));
     if (!hp) return NULL;
 
-    hp->cap = capacity;
-    hp->obj_size = obj_size;
-    hp->alive = 0;
-    hp->blob = (uint8_t*) MARU_MALLOC((obj_size + sizeof(slot_hdr_t)) * capacity);
+    if (obj_align == 0) obj_align = 1;
+
+    size_t obj_off = ALIGN_UP(sizeof(slot_hdr_t), obj_align);
+    size_t slot_bytes = obj_off + obj_size;
+    size_t stride = ALIGN_UP(slot_bytes, obj_align);
+
+    size_t blob_bytes = 0;
+    if (!safe_mul(stride, capacity, &blob_bytes)) {
+        MARU_FREE(hp);
+        return NULL;
+    }
+
+    hp->blob = (uint8_t*) MARU_MALLOC(blob_bytes);
     if (!hp->blob) {
         MARU_FREE(hp);
         return NULL;
     }
+
+    hp->cap = capacity;
+    hp->obj_size = obj_size;
+    hp->obj_align = obj_align;
+    hp->stride = stride;
+    hp->obj_off = obj_off;
+    hp->alive = 0;
 
     for (uint32_t i = 0; i < (uint32_t) capacity; ++i) {
         slot_hdr_t *h = slot_hdr_at(hp, i);
         h->gen = 1;
         h->used = 0;
         h->next = i + 1;
+#if defined(MARU_DEBUG)
+        memset(slot_obj_at(hp, i), 0xDD, obj_size);
+#endif
     }
-    ((slot_hdr_t*) slot_hdr_at(hp, (uint32_t) capacity - 1))->next = (uint32_t) capacity; /* end */
+
+    slot_hdr_at(hp, (uint32_t) capacity - 1)->next = (uint32_t) capacity; /* end sentinel */
     hp->free_head = 0;
+
     return hp;
 }
 
@@ -148,10 +174,10 @@ handle_t handle_pool_alloc(handle_pool_t *hp, const void *init_data) {
         ret = make_handle(idx, h->gen);
     }
 
-    return make_handle(idx, h->gen);
+    return ret;
 }
 
-static inline int validate(handle_pool_t *hp, handle_t h, uint32_t *out_idx, slot_hdr_t **out_hdr) {
+static inline int validate(const handle_pool_t *hp, handle_t h, uint32_t *out_idx, slot_hdr_t **out_hdr) {
     if (!hp || h == HANDLE_INVALID) return 0;
     uint32_t idx = get_handle_index(h);
     uint32_t gen = get_handle_gen(h);
@@ -172,7 +198,7 @@ void *handle_pool_get(handle_pool_t *hp, handle_t h) {
     return slot_obj_at(hp, idx);
 }
 
-const void *handle_pool_get_const(handle_pool_t *hp, handle_t h) {
+const void *handle_pool_get_const(const handle_pool_t *hp, handle_t h) {
     uint32_t idx;
     if (!validate(hp, h, &idx, NULL)) return NULL;
     return slot_obj_at(hp, idx);
@@ -180,14 +206,17 @@ const void *handle_pool_get_const(handle_pool_t *hp, handle_t h) {
 
 void handle_pool_free(handle_pool_t *hp, handle_t h) {
     uint32_t idx;
-    slot_hdr_t *hdr;
-    if (!validate(hp, h, &idx, &hdr)) return;
+    const slot_hdr_t *chdr;
+    if (!validate(hp, h, &idx, &chdr)) return;
+
+    slot_hdr_t *hdr = (slot_hdr_t*) chdr;
     hdr->used = 0;
     hdr->gen = (uint8_t) (hdr->gen + 1);
     if (hdr->gen == 0) hdr->gen = 1;
 
     hdr->next = hp->free_head;
     hp->free_head = idx;
+
     if (hp->alive) --hp->alive;
 }
 

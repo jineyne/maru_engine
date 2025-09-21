@@ -25,7 +25,6 @@ const void *handle_pool_get_const(const handle_pool_t *hp, handle_t h);
 
 void handle_pool_free(handle_pool_t *hp, handle_t h);
 
-/* Ελ°θ */
 size_t handle_pool_capacity(const handle_pool_t *hp);
 size_t handle_pool_alive_count(const handle_pool_t *hp);
 

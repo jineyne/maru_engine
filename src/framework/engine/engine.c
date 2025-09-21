@@ -16,6 +16,7 @@
 #include "platform/window.h"
 
 #include "time.h"
+#include "asset/texture_manager.h"
 #include "mem/mem_diag.h"
 #include "mem/mem_frame.h"
 
@@ -285,6 +286,10 @@ int maru_engine_init(const char *config_path) {
     g_back_rt = g_ctx.active_rhi->get_backbuffer_rt(g_ctx.active_device);
     boot_prof_step(&prof, "swapchain+backbuffer");
 
+    frame_arena_init(8 * 1024 * 1024, 2);
+
+    tex_manager_init(512);
+
     create_triangle_resources();
     boot_prof_step(&prof, "create_triangle_resources");
 
@@ -299,7 +304,6 @@ int maru_engine_init(const char *config_path) {
     config_free(&cfg);
     boot_prof_total(&prof);
 
-    frame_arena_init(8 * 1024 * 1024, 2);
 
     initialized = 1;
     return MARU_OK;
@@ -342,9 +346,11 @@ bool maru_engine_tick(void) {
 void maru_engine_shutdown(void) {
     if (!initialized) return;
 
-    frame_arena_shutdown();
-
     asset_free_texture(g_texture);
+
+    tex_manager_shutdown();
+
+    frame_arena_shutdown();
 
     if (g_ctx.active_rhi) {
         const rhi_dispatch_t *rhi = g_ctx.active_rhi;
