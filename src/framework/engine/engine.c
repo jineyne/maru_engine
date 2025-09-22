@@ -55,7 +55,7 @@ static rhi_pipeline_t *g_triangle_pl = NULL;
 
 static rhi_buffer_t *g_mvp_cb = NULL;
 
-static texture_handle_t g_texture = NULL;
+static texture_handle_t g_texture = TEX_HANDLE_INVALID;
 static rhi_sampler_t *g_sampler = NULL;
 
 static void update_mvp_from_size(int w, int h) {
@@ -127,7 +127,7 @@ static void create_triangle_resources(void) {
     g_triangle_ib = rhi->create_buffer(g_ctx.active_device, &ibd, idx);
 
     size_t buf_len = 0;
-    char *buf = asset_read_all("shader\\default.hlsl", &buf_len, TRUE);
+    char *buf = asset_read_all("shader/default.hlsl", &buf_len, TRUE);
     if (buf == NULL) {
         FATAL("unable to load shader");
         return;
@@ -192,7 +192,10 @@ static void create_triangle_resources(void) {
         .flip_y = 0,
         .force_rgba = 1
     };
-    g_texture = tex_create_from_file("texture\\karina.jpg", &opts);
+    g_texture = tex_create_from_file("texture/karina.jpg", &opts);
+    if (g_texture == TEX_HANDLE_INVALID) {
+        ERROR("failed to load texture");
+    }
 
     rhi_sampler_desc_t sampler_desc = {0};
     sampler_desc.min_filter = RHI_FILTER_LINEAR;
@@ -289,7 +292,10 @@ int maru_engine_init(const char *config_path) {
 
     frame_arena_init(8 * 1024 * 1024, 2);
 
-    texture_manager_init(512);
+    if (texture_manager_init(512) != 0) {
+        FATAL("texture manager initialize failed");
+        return MARU_ERR_INVALID;
+    }
 
     create_triangle_resources();
     boot_prof_step(&prof, "create_triangle_resources");
