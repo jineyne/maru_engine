@@ -32,14 +32,16 @@ int sprite_system_init(size_t capacity) {
         return -1;
     }
 
-    g_sprite_pool.capacity = (uint32_t)capacity;
-    g_sprite_pool.sprites = (sprite_t *)MARU_CALLOC(capacity, sizeof(sprite_t));
-    g_sprite_pool.free_list = (uint32_t *)MARU_MALLOC(capacity * sizeof(uint32_t));
+    g_sprite_pool.capacity = (uint32_t) capacity;
+    g_sprite_pool.sprites = (sprite_t*) MARU_CALLOC(capacity, sizeof(sprite_t));
+    g_sprite_pool.free_list = (uint32_t*) MARU_MALLOC(capacity * sizeof(uint32_t));
 
     if (!g_sprite_pool.sprites || !g_sprite_pool.free_list) {
         ERROR("sprite system allocation failed");
-        if (g_sprite_pool.sprites) MARU_FREE(g_sprite_pool.sprites);
-        if (g_sprite_pool.free_list) MARU_FREE(g_sprite_pool.free_list);
+        if (g_sprite_pool.sprites)
+            MARU_FREE(g_sprite_pool.sprites);
+        if (g_sprite_pool.free_list)
+            MARU_FREE(g_sprite_pool.free_list);
         return -1;
     }
 
@@ -85,19 +87,19 @@ sprite_handle_t sprite_create(const sprite_desc_t *desc) {
     float hw = desc->width * 0.5f;
     float hh = desc->height * 0.5f;
     float vertices[] = {
-        /* pos */          /* uv */       /* normal */
-        -hw, -hh, 0.0f,    0.0f, 1.0f,    0, 0, 1,  /* bottom-left */
-         hw, -hh, 0.0f,    1.0f, 1.0f,    0, 0, 1,  /* bottom-right */
-         hw,  hh, 0.0f,    1.0f, 0.0f,    0, 0, 1,  /* top-right */
-        -hw,  hh, 0.0f,    0.0f, 0.0f,    0, 0, 1,  /* top-left */
+        /* pos */ /* uv */ /* normal */
+        -hw, -hh, 0.0f, 0.0f, 1.0f, 0, 0, 1, /* bottom-left */
+        hw, -hh, 0.0f, 1.0f, 1.0f, 0, 0, 1, /* bottom-right */
+        hw, hh, 0.0f, 1.0f, 0.0f, 0, 0, 1, /* top-right */
+        -hw, hh, 0.0f, 0.0f, 0.0f, 0, 0, 1, /* top-left */
     };
 
-    uint32_t indices[] = {0, 2, 1, 2, 0, 3};  /* CW winding */
+    uint32_t indices[] = {0, 2, 1, 2, 0, 3}; /* CW winding */
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 3)},
-        {"NORMAL",   0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 5)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 3)},
+        {"NORMAL", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 5)},
     };
 
     mesh_desc_t mesh_desc = {0};
@@ -125,7 +127,7 @@ sprite_handle_t sprite_create(const sprite_desc_t *desc) {
     s->height = desc->height;
     g_sprite_pool.count++;
 
-    return (sprite_handle_t)(idx + 1);
+    return (sprite_handle_t) (idx + 1);
 }
 
 void sprite_destroy(sprite_handle_t h) {

@@ -42,7 +42,7 @@ static int extract_extension(const char *path, char *out_ext, size_t ext_size) {
     }
 
     for (size_t i = 0; i < len; i++) {
-        out_ext[i] = (char)tolower((unsigned char)dot[i]);
+        out_ext[i] = (char) tolower((unsigned char) dot[i]);
     }
     out_ext[len] = '\0';
 
@@ -81,7 +81,7 @@ int asset_importer_register(const asset_importer_vtable_t *importer) {
     return 0;
 }
 
-const asset_importer_vtable_t* asset_importer_find(const char *path) {
+const asset_importer_vtable_t *asset_importer_find(const char *path) {
     if (!path) {
         return NULL;
     }
@@ -103,7 +103,7 @@ const asset_importer_vtable_t* asset_importer_find(const char *path) {
     return NULL;
 }
 
-void* asset_import(const char *path, const void *opts) {
+void *asset_import(const char *path, const void *opts) {
     const asset_importer_vtable_t *importer = asset_importer_find(path);
     if (!importer) {
         ERROR("Failed to find importer for: %s", path);

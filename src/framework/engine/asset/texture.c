@@ -108,7 +108,7 @@ void asset_free_texture(texture_t *tex) {
     if (!tex) return;
 
     if (tex->internal) {
-        rhi_texture_t *rhi_tex = (rhi_texture_t *)tex->internal;
+        rhi_texture_t *rhi_tex = (rhi_texture_t*) tex->internal;
         if (g_ctx.active_device && g_ctx.active_rhi && g_ctx.active_rhi->destroy_texture) {
             g_ctx.active_rhi->destroy_texture(g_ctx.active_device, rhi_tex);
         } else {

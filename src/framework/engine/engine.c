@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "asset/asset.h"
 #include "asset/importer.h"
 #include "asset/texture_manager.h"
 #include "asset/mesh.h"

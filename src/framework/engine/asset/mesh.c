@@ -30,14 +30,16 @@ int mesh_system_init(size_t capacity) {
         return -1;
     }
 
-    g_mesh_pool.capacity = (uint32_t)capacity;
-    g_mesh_pool.meshes = (mesh_t *)MARU_CALLOC(capacity, sizeof(mesh_t));
-    g_mesh_pool.free_list = (uint32_t *)MARU_MALLOC(capacity * sizeof(uint32_t));
+    g_mesh_pool.capacity = (uint32_t) capacity;
+    g_mesh_pool.meshes = (mesh_t*) MARU_CALLOC(capacity, sizeof(mesh_t));
+    g_mesh_pool.free_list = (uint32_t*) MARU_MALLOC(capacity * sizeof(uint32_t));
 
     if (!g_mesh_pool.meshes || !g_mesh_pool.free_list) {
         ERROR("mesh system allocation failed");
-        if (g_mesh_pool.meshes) MARU_FREE(g_mesh_pool.meshes);
-        if (g_mesh_pool.free_list) MARU_FREE(g_mesh_pool.free_list);
+        if (g_mesh_pool.meshes)
+            MARU_FREE(g_mesh_pool.meshes);
+        if (g_mesh_pool.free_list)
+            MARU_FREE(g_mesh_pool.free_list);
         return -1;
     }
 
@@ -99,7 +101,7 @@ mesh_handle_t mesh_create(const mesh_desc_t *desc) {
     rhi_buffer_desc_t vbd = {0};
     vbd.size = desc->vertex_size * desc->vertex_count;
     vbd.usage = RHI_BUF_VERTEX;
-    vbd.stride = (uint32_t)desc->vertex_size;
+    vbd.stride = (uint32_t) desc->vertex_size;
     m->vb = rhi->create_buffer(g_ctx.active_device, &vbd, desc->vertices);
     if (!m->vb) {
         ERROR("mesh_create: failed to create vertex buffer");
@@ -125,7 +127,7 @@ mesh_handle_t mesh_create(const mesh_desc_t *desc) {
     m->index_count = desc->index_count;
     g_mesh_pool.count++;
 
-    return (mesh_handle_t)(idx + 1);
+    return (mesh_handle_t) (idx + 1);
 }
 
 void mesh_destroy(mesh_handle_t h) {

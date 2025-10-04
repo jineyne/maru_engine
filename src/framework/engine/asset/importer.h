@@ -13,7 +13,7 @@ extern "C" {
  */
 
 typedef struct asset_importer_vtable_t {
-    const char *name;  /* Importer name (e.g., "texture", "mesh_obj") */
+    const char *name; /* Importer name (e.g., "texture", "mesh_obj") */
 
     /**
      * Check if this importer supports the given file extension
@@ -28,7 +28,7 @@ typedef struct asset_importer_vtable_t {
      * @param opts Importer-specific options (can be NULL)
      * @return Pointer to loaded asset (type-specific), NULL on failure
      */
-    void* (*import)(const char *path, const void *opts);
+    void * (*import)(const char *path, const void *opts);
 
     /**
      * Free imported asset
@@ -43,7 +43,6 @@ typedef struct asset_importer_vtable_t {
      * @return 0 on success, error code otherwise
      */
     int (*get_metadata)(const char *path, void *out_meta);
-
 } asset_importer_vtable_t;
 
 /**
@@ -68,7 +67,7 @@ int asset_importer_register(const asset_importer_vtable_t *importer);
  * @param path File path (extension will be extracted)
  * @return Importer vtable or NULL if not found
  */
-const asset_importer_vtable_t* asset_importer_find(const char *path);
+const asset_importer_vtable_t *asset_importer_find(const char *path);
 
 /**
  * Auto-import asset using appropriate importer
@@ -76,7 +75,7 @@ const asset_importer_vtable_t* asset_importer_find(const char *path);
  * @param opts Importer-specific options (can be NULL)
  * @return Loaded asset or NULL on failure
  */
-void* asset_import(const char *path, const void *opts);
+void *asset_import(const char *path, const void *opts);
 
 #ifdef __cplusplus
 }
