@@ -22,7 +22,6 @@ typedef struct asset_texture_opts_t {
 
 texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *opts);
 void asset_free_texture(texture_t *tex);
-
 void *asset_texture_get_rhi_handle(texture_t *tex);
 
 #ifdef __cplusplus

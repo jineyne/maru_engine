@@ -3,6 +3,9 @@ set(ENGINE_ASSET_SRC
     "engine/asset/texture.c"
     "engine/asset/texture_manager.c")
 
+set(ENGINE_MATERIAL_SRC
+    "engine/material/material.c")
+
 set(ENGINE_RENDERER_SRC
     "engine/renderer/renderer.c")
 
@@ -18,6 +21,7 @@ set(ENGINE_NOFILTER_SRC
 
 set(ENGINE_SOURCES
     ${ENGINE_ASSET_SRC}
+    ${ENGINE_MATERIAL_SRC}
     ${ENGINE_RENDERER_SRC}
     ${ENGINE_RHI_SRC}
     ${ENGINE_NOFILTER_SRC}
