@@ -81,23 +81,23 @@ sprite_handle_t sprite_create(const sprite_desc_t *desc) {
         return SPRITE_HANDLE_INVALID;
     }
 
-    /* Create quad mesh: position(3) + color(3) + uv(2) */
+    /* Create quad mesh: position(3) + texcoord(2) + normal(3) */
     float hw = desc->width * 0.5f;
     float hh = desc->height * 0.5f;
     float vertices[] = {
-        /* pos */          /* color */    /* uv */
-        -hw, -hh, 0.0f,    1, 1, 1,       0.0f, 1.0f,  /* bottom-left */
-         hw, -hh, 0.0f,    1, 1, 1,       1.0f, 1.0f,  /* bottom-right */
-         hw,  hh, 0.0f,    1, 1, 1,       1.0f, 0.0f,  /* top-right */
-        -hw,  hh, 0.0f,    1, 1, 1,       0.0f, 0.0f,  /* top-left */
+        /* pos */          /* uv */       /* normal */
+        -hw, -hh, 0.0f,    0.0f, 1.0f,    0, 0, 1,  /* bottom-left */
+         hw, -hh, 0.0f,    1.0f, 1.0f,    0, 0, 1,  /* bottom-right */
+         hw,  hh, 0.0f,    1.0f, 0.0f,    0, 0, 1,  /* top-right */
+        -hw,  hh, 0.0f,    0.0f, 0.0f,    0, 0, 1,  /* top-left */
     };
 
     uint32_t indices[] = {0, 2, 1, 2, 0, 3};  /* CW winding */
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR",    0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
-        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 3)},
+        {"NORMAL",   0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 5)},
     };
 
     mesh_desc_t mesh_desc = {0};

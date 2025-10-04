@@ -181,8 +181,8 @@ material_handle_t material_create(const material_desc_t *desc) {
     /* Default vertex layout: Position(3) + Color(3) + UV(2) */
     static const rhi_vertex_attr_t default_attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 3)},
-        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 6)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 3)},
+        {"NORMAL", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 5)},
     };
     pd.layout.attrs = default_attrs;
     pd.layout.attr_count = 3;

@@ -26,6 +26,9 @@ void maru_log(maru_log_level level, const char *fmt, ...) {
     case MARU_LOG_INFO:
         snprintf(prefix, sizeof(prefix), "[INFO] ");
         break;
+    case MARU_LOG_WARN:
+        snprintf(prefix, sizeof(prefix), "[WARN] ");
+        break;
     case MARU_LOG_ERROR:
         snprintf(prefix, sizeof(prefix), "[ERROR] ");
         break;

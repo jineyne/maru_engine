@@ -6,6 +6,7 @@
 #include "asset/sprite.h"
 #include "asset/texture_manager.h"
 #include "asset/asset.h"
+#include "asset/importer.h"
 #include "math/math.h"
 #include "math/proj.h"
 #include "platform/window.h"
@@ -85,36 +86,48 @@ static void app_render(renderer_t *R, void *user) {
 }
 
 static void app_init(void) {
-    /* Create triangle mesh */
-    float vtx[] = {
-        //          position             color     uv
-        /* top   */ 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
-        /* right */ 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
-        /* left  */ -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
-    };
-
-    uint32_t idx[] = {0, 1, 2};
-
-    static const rhi_vertex_attr_t attrs[] = {
-        {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 3)},
-        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 6)},
-    };
-
-    mesh_desc_t mesh_desc = {0};
-    mesh_desc.vertices = vtx;
-    mesh_desc.vertex_size = sizeof(float) * 8;
-    mesh_desc.vertex_count = 3;
-    mesh_desc.indices = idx;
-    mesh_desc.index_count = 3;
-    mesh_desc.attrs = attrs;
-    mesh_desc.attr_count = 3;
-
-    g_triangle_mesh = mesh_create(&mesh_desc);
-    if (g_triangle_mesh == MESH_HANDLE_INVALID) {
-        ERROR("failed to create triangle mesh");
+    /* Load triangle mesh using asset importer */
+    mesh_handle_t *mesh_h = (mesh_handle_t*)asset_import("mesh/triangle.obj", NULL);
+    if (!mesh_h) {
+        ERROR("failed to load triangle mesh from OBJ");
         return;
     }
+    g_triangle_mesh = *mesh_h;
+    MARU_FREE(mesh_h);
+
+    /*
+     * Alternative: Create triangle mesh manually (old way)
+     *
+     * float vtx[] = {
+     *     //          position             color     uv
+     *     / * top   * / 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
+     *     / * right * / 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
+     *     / * left  * / -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
+     * };
+     *
+     * uint32_t idx[] = {0, 1, 2};
+     *
+     * static const rhi_vertex_attr_t attrs[] = {
+     *     {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
+     *     {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 3)},
+     *     {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 6)},
+     * };
+     *
+     * mesh_desc_t mesh_desc = {0};
+     * mesh_desc.vertices = vtx;
+     * mesh_desc.vertex_size = sizeof(float) * 8;
+     * mesh_desc.vertex_count = 3;
+     * mesh_desc.indices = idx;
+     * mesh_desc.index_count = 3;
+     * mesh_desc.attrs = attrs;
+     * mesh_desc.attr_count = 3;
+     *
+     * g_triangle_mesh = mesh_create(&mesh_desc);
+     * if (g_triangle_mesh == MESH_HANDLE_INVALID) {
+     *     ERROR("failed to create triangle mesh");
+     *     return;
+     * }
+     */
 
     /* Create triangle material (3D) */
     material_desc_t triangle_mat_desc = {
@@ -130,7 +143,7 @@ static void app_init(void) {
 
     /* Create sprite material (2D) */
     material_desc_t sprite_mat_desc = {
-        .shader_path = "shader/default.hlsl",
+        .shader_path = "shader/sprite.hlsl",
         .vs_entry = "VSMain",
         .ps_entry = "PSMain"
     };

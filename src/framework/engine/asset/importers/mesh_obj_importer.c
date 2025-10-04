@@ -64,11 +64,16 @@ static void obj_data_init(obj_data_t *obj) {
 }
 
 static void obj_data_free(obj_data_t *obj) {
-    if (obj->positions) MARU_FREE(obj->positions);
-    if (obj->texcoords) MARU_FREE(obj->texcoords);
-    if (obj->normals) MARU_FREE(obj->normals);
-    if (obj->vertices) MARU_FREE(obj->vertices);
-    if (obj->indices) MARU_FREE(obj->indices);
+    if (obj->positions)
+        MARU_FREE(obj->positions);
+    if (obj->texcoords)
+        MARU_FREE(obj->texcoords);
+    if (obj->normals)
+        MARU_FREE(obj->normals);
+    if (obj->vertices)
+        MARU_FREE(obj->vertices);
+    if (obj->indices)
+        MARU_FREE(obj->indices);
     memset(obj, 0, sizeof(*obj));
 }
 
@@ -83,9 +88,10 @@ static int parse_obj(const char *data, obj_data_t *obj) {
     while (*ptr) {
         /* Read line */
         int i = 0;
-        while (*ptr && *ptr != '\n' && i < (int)sizeof(line) - 1) {
+        while (*ptr && *ptr != '\n' && i < (int) sizeof(line) - 1) {
             line[i++] = *ptr++;
         }
+
         line[i] = '\0';
         if (*ptr == '\n') ptr++;
 
@@ -129,9 +135,9 @@ static int parse_obj(const char *data, obj_data_t *obj) {
         else if (line[0] == 'f' && line[1] == ' ') {
             int v[3], vt[3], vn[3];
             int matched = sscanf(line + 2, "%d/%d/%d %d/%d/%d %d/%d/%d",
-                &v[0], &vt[0], &vn[0],
-                &v[1], &vt[1], &vn[1],
-                &v[2], &vt[2], &vn[2]);
+                                 &v[0], &vt[0], &vn[0],
+                                 &v[1], &vt[1], &vn[1],
+                                 &v[2], &vt[2], &vn[2]);
 
             if (matched == 9) {
                 /* Create vertices for triangle */
@@ -148,13 +154,13 @@ static int parse_obj(const char *data, obj_data_t *obj) {
                     int tidx = vt[j] - 1;
                     int nidx = vn[j] - 1;
 
-                    if (pidx >= 0 && pidx < (int)obj->pos_count) {
+                    if (pidx >= 0 && pidx < (int) obj->pos_count) {
                         vert.position = obj->positions[pidx];
                     }
-                    if (tidx >= 0 && tidx < (int)obj->tex_count) {
+                    if (tidx >= 0 && tidx < (int) obj->tex_count) {
                         vert.texcoord = obj->texcoords[tidx];
                     }
-                    if (nidx >= 0 && nidx < (int)obj->norm_count) {
+                    if (nidx >= 0 && nidx < (int) obj->norm_count) {
                         vert.normal = obj->normals[nidx];
                     }
 
@@ -175,8 +181,8 @@ static int mesh_obj_check(const char *ext) {
     return strcmp(ext, ".obj") == 0;
 }
 
-static void* mesh_obj_import(const char *path, const void *opts) {
-    (void)opts; /* No options for now */
+static void *mesh_obj_import(const char *path, const void *opts) {
+    UNUSED(opts);
 
     /* Read OBJ file */
     size_t data_size;
@@ -197,9 +203,9 @@ static void* mesh_obj_import(const char *path, const void *opts) {
 
     /* Create mesh descriptor */
     static const rhi_vertex_attr_t attrs[] = {
-        { .location = 0, .format = RHI_FMT_RGB32F, .offset = offsetof(vertex_t, position) },
-        { .location = 1, .format = RHI_FMT_RG32F,  .offset = offsetof(vertex_t, texcoord) },
-        { .location = 2, .format = RHI_FMT_RGB32F, .offset = offsetof(vertex_t, normal) }
+        {"POSITION", 0, RHI_VTX_F32x3, 0, offsetof(vertex_t, position)},
+        {"TEXCOORD", 1, RHI_VTX_F32x2, 0, offsetof(vertex_t, texcoord)},
+        {"NORMAL", 2, RHI_VTX_F32x3, 0, offsetof(vertex_t, normal)}
     };
 
     mesh_desc_t desc = {0};
@@ -226,13 +232,13 @@ static void* mesh_obj_import(const char *path, const void *opts) {
     mesh_handle_t *h = MARU_MALLOC(sizeof(mesh_handle_t));
     *h = handle;
 
-    return (void*)h;
+    return (void*) h;
 }
 
 static void mesh_obj_free(void *asset) {
     if (!asset) return;
 
-    mesh_handle_t *h = (mesh_handle_t*)asset;
+    mesh_handle_t *h = (mesh_handle_t*) asset;
     mesh_destroy(*h);
     MARU_FREE(h);
 }

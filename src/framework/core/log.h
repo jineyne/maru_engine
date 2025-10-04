@@ -9,6 +9,7 @@ extern "C" {
 
 typedef enum {
     MARU_LOG_INFO,
+    MARU_LOG_WARN,
     MARU_LOG_ERROR,
     MARU_LOG_FATAL,
     MARU_LOG_DEBUG
@@ -25,6 +26,7 @@ void maru_log(maru_log_level level, const char *fmt, ...);
 #define MR_LOG(type, ...) maru_log(MARU_LOG_##type, __VA_ARGS__)
 
 #define INFO(...)  maru_log(MARU_LOG_INFO, __VA_ARGS__)
+#define WARN(...)  maru_log(MARU_LOG_WARN, __VA_ARGS__)
 #define ERROR(...) maru_log(MARU_LOG_ERROR, __VA_ARGS__)
 #define FATAL(...) maru_log(MARU_LOG_FATAL, __VA_ARGS__)
 #if DEBUG_ENABLED

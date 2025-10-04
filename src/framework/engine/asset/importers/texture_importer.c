@@ -14,18 +14,12 @@
 static int texture_check(const char *ext) {
     if (!ext) return 0;
 
-    /* Extension already lowercase from importer manager */
-    return (strcmp(ext, ".png") == 0 ||
-            strcmp(ext, ".jpg") == 0 ||
-            strcmp(ext, ".jpeg") == 0 ||
-            strcmp(ext, ".tga") == 0 ||
-            strcmp(ext, ".bmp") == 0);
+    return (strcmp(ext, ".png") == 0 || strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0 || strcmp(ext, ".tga") == 0 || strcmp(ext, ".bmp") == 0);
 }
 
-static void* texture_import(const char *path, const void *opts) {
-    const asset_texture_opts_t *tex_opts = (const asset_texture_opts_t*)opts;
+static void *texture_import(const char *path, const void *opts) {
+    const asset_texture_opts_t *tex_opts = (const asset_texture_opts_t*) opts;
 
-    /* Use existing asset_load_texture implementation */
     texture_t *tex = asset_load_texture(path, tex_opts);
 
     if (!tex) {
@@ -33,19 +27,19 @@ static void* texture_import(const char *path, const void *opts) {
         return NULL;
     }
 
-    return (void*)tex;
+    return (void*) tex;
 }
 
 static void texture_free(void *asset) {
     if (!asset) return;
-    asset_free_texture((texture_t*)asset);
+    asset_free_texture((texture_t*) asset);
 }
 
 static int texture_get_metadata(const char *path, void *out_meta) {
     /* TODO: Implement metadata extraction without full load */
-    (void)path;
-    (void)out_meta;
-    return -1; /* Not implemented */
+    UNUSED(path);
+    UNUSED(out_meta);
+    return -1;
 }
 
 /* Public importer vtable */

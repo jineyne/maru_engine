@@ -1,0 +1,20 @@
+# Simple triangle mesh
+# Converted from testbed hardcoded data
+
+# Vertices (position)
+v 0.0 0.5 0.0
+v 0.5 -0.5 0.0
+v -0.5 -0.5 0.0
+
+# Texture coordinates
+vt 0.5 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+
+# Normals (pointing forward)
+vn 0.0 0.0 1.0
+vn 0.0 0.0 1.0
+vn 0.0 0.0 1.0
+
+# Face (v/vt/vn)
+f 1/1/1 2/2/2 3/3/3
