@@ -106,17 +106,16 @@ static void update_sprite_mvp_from_size(int w, int h) {
     material_set_mat4(g_sprite_material, "uMVP", (const float*)MVP);
 }
 
-static void record_scene(rhi_cmd_t *cmd, void *user) {
+static void record_scene(renderer_t *R, void *user) {
     /* Draw 2D sprite first (no depth write) */
     if (g_sprite != SPRITE_HANDLE_INVALID) {
-        renderer_bind_material(cmd, g_sprite_material);
-        sprite_draw(cmd, g_sprite, 0.0f, 0.0f);
+        renderer_bind_material(R, g_sprite_material);
+        renderer_draw_sprite(R, g_sprite, 0.0f, 0.0f);
     }
 
     /* Draw 3D triangle */
-    renderer_bind_material(cmd, g_triangle_material);
-    mesh_bind(cmd, g_triangle_mesh);
-    mesh_draw(cmd, g_triangle_mesh);
+    renderer_bind_material(R, g_triangle_material);
+    renderer_draw_mesh(R, g_triangle_mesh);
 }
 
 static void create_triangle_resources(void) {

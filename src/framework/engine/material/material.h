@@ -45,8 +45,9 @@ void material_set_vec4(material_handle_t h, const char *name, const float *v);
 void material_set_mat4(material_handle_t h, const char *name, const float *m);
 void material_set_texture(material_handle_t h, const char *name, texture_handle_t tex);
 
+/* Internal - used by renderer */
 struct rhi_cmd;
-void renderer_bind_material(struct rhi_cmd *cmd, material_handle_t h);
+void material_bind(struct rhi_cmd *cmd, material_handle_t h);
 
 #ifdef __cplusplus
 }

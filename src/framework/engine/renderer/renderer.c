@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rhi/rhi.h"
+#include "material/material.h"
+#include "asset/mesh.h"
+#include "asset/sprite.h"
 #include "asset/asset.h"
 #include "mem/mem_diag.h"
 
@@ -146,29 +150,30 @@ void renderer_render(renderer_t *R) {
     if (!R || !R->rhi) return;
     const rhi_dispatch_t *r = R->rhi;
 
-    rhi_cmd_t *cmd = r->begin_cmd(R->dev);
+    R->current_cmd = r->begin_cmd(R->dev);
 
     /* Pass 1: Offscreen scene */
     const float clear1[4] = {0.1f, 0.1f, 0.1f, 1.0f};
-    r->cmd_begin_render(cmd, R->off_rt, clear1);
+    r->cmd_begin_render(R->current_cmd, R->off_rt, clear1);
     if (R->scene_cb) {
-        R->scene_cb(cmd, R->scene_user);
+        R->scene_cb(R, R->scene_user);
     }
-    r->cmd_end_render(cmd);
+    r->cmd_end_render(R->current_cmd);
 
     /* Pass 2: Post to backbuffer */
     rhi_render_target_t *back = r->get_backbuffer_rt ? r->get_backbuffer_rt(R->dev) : NULL;
-    r->cmd_begin_render(cmd, back, NULL);
-    r->cmd_bind_pipeline(cmd, R->post_pl);
+    r->cmd_begin_render(R->current_cmd, back, NULL);
+    r->cmd_bind_pipeline(R->current_cmd, R->post_pl);
 
     rhi_binding_t b0[2] = {0};
-    r->cmd_bind_texture(cmd, R->off_color, 0, RHI_STAGE_PS);
-    r->cmd_bind_sampler(cmd, R->post_sampler, 0, RHI_STAGE_PS);
+    r->cmd_bind_texture(R->current_cmd, R->off_color, 0, RHI_STAGE_PS);
+    r->cmd_bind_sampler(R->current_cmd, R->post_sampler, 0, RHI_STAGE_PS);
 
-    r->cmd_draw(cmd, 3, 0, 1);
-    r->cmd_end_render(cmd);
+    r->cmd_draw(R->current_cmd, 3, 0, 1);
+    r->cmd_end_render(R->current_cmd);
 
-    r->end_cmd(cmd);
+    r->end_cmd(R->current_cmd);
+    R->current_cmd = NULL;
 }
 
 void renderer_shutdown(renderer_t *R) {
@@ -176,4 +181,21 @@ void renderer_shutdown(renderer_t *R) {
     destroy_offscreen(R);
     destroy_post(R);
     memset(R, 0, sizeof(*R));
+}
+
+/* Rendering API */
+void renderer_bind_material(renderer_t *R, material_handle_t mat) {
+    if (!R || !R->current_cmd) return;
+    material_bind(R->current_cmd, mat);
+}
+
+void renderer_draw_mesh(renderer_t *R, mesh_handle_t mesh) {
+    if (!R || !R->current_cmd) return;
+    mesh_bind(R->current_cmd, mesh);
+    mesh_draw(R->current_cmd, mesh);
+}
+
+void renderer_draw_sprite(renderer_t *R, sprite_handle_t sprite, float x, float y) {
+    if (!R || !R->current_cmd) return;
+    sprite_draw(R->current_cmd, sprite, x, y);
 }

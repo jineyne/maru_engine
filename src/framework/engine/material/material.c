@@ -461,7 +461,7 @@ static void material_update_cbuffers(material_t *m) {
     }
 }
 
-void renderer_bind_material(rhi_cmd_t *cmd, material_handle_t mh) {
+void material_bind(rhi_cmd_t *cmd, material_handle_t mh) {
     if (!s_pool || mh == MAT_HANDLE_INVALID || !cmd) return;
     material_t *m = (material_t*) handle_pool_get(s_pool, (handle_t) mh);
     if (!m) return;
