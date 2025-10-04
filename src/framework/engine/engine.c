@@ -10,6 +10,8 @@
 
 #include "asset/asset.h"
 #include "asset/texture_manager.h"
+#include "asset/mesh.h"
+#include "asset/sprite.h"
 #include "material/material.h"
 #include "math/math.h"
 #include "math/proj.h"
@@ -49,14 +51,14 @@ static renderer_t g_renderer;
 static rhi_swapchain_t *g_swapchain = NULL;
 static rhi_render_target_t *g_back_rt = NULL;
 
-static rhi_buffer_t *g_triangle_vb = NULL;
-static rhi_buffer_t *g_triangle_ib = NULL;
-
-static material_handle_t g_material = MAT_HANDLE_INVALID;
+static mesh_handle_t g_triangle_mesh = MESH_HANDLE_INVALID;
+static sprite_handle_t g_sprite = SPRITE_HANDLE_INVALID;
+static material_handle_t g_triangle_material = MAT_HANDLE_INVALID;
+static material_handle_t g_sprite_material = MAT_HANDLE_INVALID;
 static texture_handle_t g_texture = TEX_HANDLE_INVALID;
 
-static void update_mvp_from_size(int w, int h) {
-    if (!g_ctx.active_rhi || !g_ctx.active_device || g_material == MAT_HANDLE_INVALID) return;
+static void update_triangle_mvp_from_size(int w, int h) {
+    if (!g_ctx.active_rhi || !g_ctx.active_device || g_triangle_material == MAT_HANDLE_INVALID) return;
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
     static float s_angle = 0.0f;
@@ -82,54 +84,100 @@ static void update_mvp_from_size(int w, int h) {
     mat4_mul(PV, R, MVP);
     mat4_to_backend_order(&caps, MVP, MVP);
 
-    material_set_mat4(g_material, "uMVP", (const float*)MVP);
+    material_set_mat4(g_triangle_material, "uMVP", (const float*)MVP);
+}
+
+static void update_sprite_mvp_from_size(int w, int h) {
+    if (!g_ctx.active_rhi || !g_ctx.active_device || g_sprite_material == MAT_HANDLE_INVALID) return;
+    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
+
+    rhi_capabilities_t caps;
+    rhi->get_capabilities(g_ctx.active_device, &caps);
+
+    mat4_t P, MVP;
+    ortho_from_caps(&caps, 0.0f, (float)w, 0.0f, (float)h, -1.0f, 1.0f, P);
+
+    mat4_identity(MVP);
+    vec3_t position = {100, 200, 0.0f};
+    glm_translate(MVP, position);
+
+    mat4_mul(P, MVP, MVP);
+
+    material_set_mat4(g_sprite_material, "uMVP", (const float*)MVP);
 }
 
 static void record_scene(rhi_cmd_t *cmd, void *user) {
-    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
+    /* Draw 2D sprite first (no depth write) */
+    if (g_sprite != SPRITE_HANDLE_INVALID) {
+        renderer_bind_material(cmd, g_sprite_material);
+        sprite_draw(cmd, g_sprite, 0.0f, 0.0f);
+    }
 
-    renderer_bind_material(cmd, g_material);
-
-    rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
-    rhi->cmd_set_index_buffer(cmd, g_triangle_ib);
-    rhi->cmd_draw_indexed(cmd, 3, 0, 0, 1);
+    /* Draw 3D triangle */
+    renderer_bind_material(cmd, g_triangle_material);
+    mesh_bind(cmd, g_triangle_mesh);
+    mesh_draw(cmd, g_triangle_mesh);
 }
 
 static void create_triangle_resources(void) {
-    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
-
     float vtx[] = {
         //          position             color     uv
         /* top   */ 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
         /* right */ 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
         /* left  */ -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
     };
-    rhi_buffer_desc_t bd = {0};
-    bd.size = sizeof(vtx);
-    bd.usage = RHI_BUF_VERTEX;
-    bd.stride = sizeof(float) * 8;
-    g_triangle_vb = rhi->create_buffer(g_ctx.active_device, &bd, vtx);
 
     uint32_t idx[] = {0, 1, 2};
-    rhi_buffer_desc_t ibd = {0};
-    ibd.size = sizeof(idx);
-    ibd.usage = RHI_BUF_INDEX;
-    g_triangle_ib = rhi->create_buffer(g_ctx.active_device, &ibd, idx);
 
-    material_desc_t mat_desc = {
+    static const rhi_vertex_attr_t attrs[] = {
+        {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
+        {"COLOR",    0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
+    };
+
+    mesh_desc_t mesh_desc = {0};
+    mesh_desc.vertices = vtx;
+    mesh_desc.vertex_size = sizeof(float) * 8;
+    mesh_desc.vertex_count = 3;
+    mesh_desc.indices = idx;
+    mesh_desc.index_count = 3;
+    mesh_desc.attrs = attrs;
+    mesh_desc.attr_count = 3;
+
+    g_triangle_mesh = mesh_create(&mesh_desc);
+    if (g_triangle_mesh == MESH_HANDLE_INVALID) {
+        FATAL("failed to create triangle mesh");
+        return;
+    }
+
+    /* Create triangle material (3D) */
+    material_desc_t triangle_mat_desc = {
         .shader_path = "shader/default.hlsl",
         .vs_entry = "VSMain",
         .ps_entry = "PSMain"
     };
-    g_material = material_create(&mat_desc);
-    if (g_material == MAT_HANDLE_INVALID) {
-        FATAL("material create failed");
+    g_triangle_material = material_create(&triangle_mat_desc);
+    if (g_triangle_material == MAT_HANDLE_INVALID) {
+        FATAL("triangle material create failed");
+        return;
+    }
+
+    /* Create sprite material (2D) */
+    material_desc_t sprite_mat_desc = {
+        .shader_path = "shader/default.hlsl",
+        .vs_entry = "VSMain",
+        .ps_entry = "PSMain"
+    };
+    g_sprite_material = material_create(&sprite_mat_desc);
+    if (g_sprite_material == MAT_HANDLE_INVALID) {
+        FATAL("sprite material create failed");
         return;
     }
 
     int cw = 0, ch = 0;
     platform_window_get_size(g_ctx.window, &cw, &ch);
-    update_mvp_from_size(cw, ch);
+    update_triangle_mvp_from_size(cw, ch);
+    update_sprite_mvp_from_size(cw, ch);
 
     asset_texture_opts_t opts = {
         .gen_mips = 1,
@@ -140,7 +188,19 @@ static void create_triangle_resources(void) {
     if (g_texture == TEX_HANDLE_INVALID) {
         ERROR("failed to load texture");
     } else {
-        material_set_texture(g_material, "gAlbedo", g_texture);
+        material_set_texture(g_triangle_material, "gAlbedo", g_texture);
+        material_set_texture(g_sprite_material, "gAlbedo", g_texture);
+
+        /* Create sprite for testing */
+        sprite_desc_t sprite_desc = {
+            .texture = g_texture,
+            .width = 100.0f,
+            .height = 100.0f
+        };
+        g_sprite = sprite_create(&sprite_desc);
+        if (g_sprite == SPRITE_HANDLE_INVALID) {
+            ERROR("failed to create sprite");
+        }
     }
 }
 
@@ -232,11 +292,21 @@ int maru_engine_init(const char *config_path) {
         return MARU_ERR_INVALID;
     }
 
+    if (mesh_system_init(256) != 0) {
+        FATAL("mesh system initialize failed");
+        return MARU_ERR_INVALID;
+    }
+
+    if (sprite_system_init(256) != 0) {
+        FATAL("sprite system initialize failed");
+        return MARU_ERR_INVALID;
+    }
+
     if (material_system_init(128) != 0) {
         FATAL("material system initialize failed");
         return MARU_ERR_INVALID;
     }
-    boot_prof_step(&prof, "material_system_init");
+    boot_prof_step(&prof, "asset_systems_init");
 
     create_triangle_resources();
     boot_prof_step(&prof, "create_triangle_resources");
@@ -279,7 +349,8 @@ bool maru_engine_tick(void) {
         }
     }
 
-    update_mvp_from_size(cur_w, cur_h);
+    update_triangle_mvp_from_size(cur_w, cur_h);
+    update_sprite_mvp_from_size(cur_w, cur_h);
 
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
@@ -294,9 +365,24 @@ bool maru_engine_tick(void) {
 void maru_engine_shutdown(void) {
     if (!initialized) return;
 
-    if (g_material != MAT_HANDLE_INVALID) {
-        material_destroy(g_material);
-        g_material = MAT_HANDLE_INVALID;
+    if (g_sprite != SPRITE_HANDLE_INVALID) {
+        sprite_destroy(g_sprite);
+        g_sprite = SPRITE_HANDLE_INVALID;
+    }
+
+    if (g_triangle_mesh != MESH_HANDLE_INVALID) {
+        mesh_destroy(g_triangle_mesh);
+        g_triangle_mesh = MESH_HANDLE_INVALID;
+    }
+
+    if (g_triangle_material != MAT_HANDLE_INVALID) {
+        material_destroy(g_triangle_material);
+        g_triangle_material = MAT_HANDLE_INVALID;
+    }
+
+    if (g_sprite_material != MAT_HANDLE_INVALID) {
+        material_destroy(g_sprite_material);
+        g_sprite_material = MAT_HANDLE_INVALID;
     }
 
     if (g_texture != TEX_HANDLE_INVALID) {
@@ -306,22 +392,13 @@ void maru_engine_shutdown(void) {
 
     material_system_shutdown();
 
+    sprite_system_shutdown();
+
+    mesh_system_shutdown();
+
     texture_manager_shutdown();
 
     frame_arena_shutdown();
-
-    if (g_ctx.active_rhi) {
-        const rhi_dispatch_t *rhi = g_ctx.active_rhi;
-
-        if (g_triangle_ib) {
-            rhi->destroy_buffer(g_ctx.active_device, g_triangle_ib);
-            g_triangle_ib = NULL;
-        }
-        if (g_triangle_vb) {
-            rhi->destroy_buffer(g_ctx.active_device, g_triangle_vb);
-            g_triangle_vb = NULL;
-        }
-    }
 
     renderer_shutdown(&g_renderer);
 
