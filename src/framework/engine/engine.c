@@ -10,6 +10,8 @@
 
 #include "asset/asset.h"
 #include "asset/texture_manager.h"
+#include "asset/mesh.h"
+#include "asset/sprite.h"
 #include "material/material.h"
 #include "math/math.h"
 #include "math/proj.h"
@@ -49,9 +51,7 @@ static renderer_t g_renderer;
 static rhi_swapchain_t *g_swapchain = NULL;
 static rhi_render_target_t *g_back_rt = NULL;
 
-static rhi_buffer_t *g_triangle_vb = NULL;
-static rhi_buffer_t *g_triangle_ib = NULL;
-
+static mesh_handle_t g_triangle_mesh = MESH_HANDLE_INVALID;
 static material_handle_t g_material = MAT_HANDLE_INVALID;
 static texture_handle_t g_texture = TEX_HANDLE_INVALID;
 
@@ -86,35 +86,42 @@ static void update_mvp_from_size(int w, int h) {
 }
 
 static void record_scene(rhi_cmd_t *cmd, void *user) {
-    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
-
     renderer_bind_material(cmd, g_material);
 
-    rhi->cmd_set_vertex_buffer(cmd, 0, g_triangle_vb);
-    rhi->cmd_set_index_buffer(cmd, g_triangle_ib);
-    rhi->cmd_draw_indexed(cmd, 3, 0, 0, 1);
+    mesh_bind(cmd, g_triangle_mesh);
+    mesh_draw(cmd, g_triangle_mesh);
 }
 
 static void create_triangle_resources(void) {
-    const rhi_dispatch_t *rhi = g_ctx.active_rhi;
-
     float vtx[] = {
         //          position             color     uv
         /* top   */ 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
         /* right */ 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
         /* left  */ -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
     };
-    rhi_buffer_desc_t bd = {0};
-    bd.size = sizeof(vtx);
-    bd.usage = RHI_BUF_VERTEX;
-    bd.stride = sizeof(float) * 8;
-    g_triangle_vb = rhi->create_buffer(g_ctx.active_device, &bd, vtx);
 
     uint32_t idx[] = {0, 1, 2};
-    rhi_buffer_desc_t ibd = {0};
-    ibd.size = sizeof(idx);
-    ibd.usage = RHI_BUF_INDEX;
-    g_triangle_ib = rhi->create_buffer(g_ctx.active_device, &ibd, idx);
+
+    static const rhi_vertex_attr_t attrs[] = {
+        {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
+        {"COLOR",    0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
+    };
+
+    mesh_desc_t mesh_desc = {0};
+    mesh_desc.vertices = vtx;
+    mesh_desc.vertex_size = sizeof(float) * 8;
+    mesh_desc.vertex_count = 3;
+    mesh_desc.indices = idx;
+    mesh_desc.index_count = 3;
+    mesh_desc.attrs = attrs;
+    mesh_desc.attr_count = 3;
+
+    g_triangle_mesh = mesh_create(&mesh_desc);
+    if (g_triangle_mesh == MESH_HANDLE_INVALID) {
+        FATAL("failed to create triangle mesh");
+        return;
+    }
 
     material_desc_t mat_desc = {
         .shader_path = "shader/default.hlsl",
@@ -232,11 +239,21 @@ int maru_engine_init(const char *config_path) {
         return MARU_ERR_INVALID;
     }
 
+    if (mesh_system_init(256) != 0) {
+        FATAL("mesh system initialize failed");
+        return MARU_ERR_INVALID;
+    }
+
+    if (sprite_system_init(256) != 0) {
+        FATAL("sprite system initialize failed");
+        return MARU_ERR_INVALID;
+    }
+
     if (material_system_init(128) != 0) {
         FATAL("material system initialize failed");
         return MARU_ERR_INVALID;
     }
-    boot_prof_step(&prof, "material_system_init");
+    boot_prof_step(&prof, "asset_systems_init");
 
     create_triangle_resources();
     boot_prof_step(&prof, "create_triangle_resources");
@@ -304,24 +321,20 @@ void maru_engine_shutdown(void) {
         g_texture = TEX_HANDLE_INVALID;
     }
 
+    if (g_triangle_mesh != MESH_HANDLE_INVALID) {
+        mesh_destroy(g_triangle_mesh);
+        g_triangle_mesh = MESH_HANDLE_INVALID;
+    }
+
     material_system_shutdown();
+
+    sprite_system_shutdown();
+
+    mesh_system_shutdown();
 
     texture_manager_shutdown();
 
     frame_arena_shutdown();
-
-    if (g_ctx.active_rhi) {
-        const rhi_dispatch_t *rhi = g_ctx.active_rhi;
-
-        if (g_triangle_ib) {
-            rhi->destroy_buffer(g_ctx.active_device, g_triangle_ib);
-            g_triangle_ib = NULL;
-        }
-        if (g_triangle_vb) {
-            rhi->destroy_buffer(g_ctx.active_device, g_triangle_vb);
-            g_triangle_vb = NULL;
-        }
-    }
 
     renderer_shutdown(&g_renderer);
 
