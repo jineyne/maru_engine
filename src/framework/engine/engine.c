@@ -8,11 +8,16 @@
 
 #include <string.h>
 
+#include "asset/importer.h"
 #include "asset/texture_manager.h"
 #include "asset/mesh.h"
 #include "asset/sprite.h"
 #include "material/material.h"
 #include "platform/window.h"
+
+/* External importer vtables */
+extern const asset_importer_vtable_t g_texture_importer;
+extern const asset_importer_vtable_t g_mesh_obj_importer;
 
 #include "time.h"
 #include "mem/mem_diag.h"
@@ -73,6 +78,12 @@ int maru_engine_init(const char *config_path) {
 
     asset_init(NULL);
     boot_prof_step(&prof, "asset_init");
+
+    /* Initialize asset importer system */
+    asset_importer_init();
+    asset_importer_register(&g_texture_importer);
+    asset_importer_register(&g_mesh_obj_importer);
+    boot_prof_step(&prof, "importer_init");
 
     maru_config_t cfg = {0};
     if (config_load(config_path, &cfg) != MARU_OK) {
@@ -208,6 +219,9 @@ void maru_engine_shutdown(void) {
 
     renderer_shutdown(&g_renderer);
     engine_context_shutdown(&g_ctx);
+
+    /* Shutdown asset importer system */
+    asset_importer_shutdown();
 
     INFO("maru shutdown");
 

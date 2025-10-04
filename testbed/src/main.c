@@ -35,7 +35,7 @@ static void app_update_triangle_mvp(int w, int h) {
     g_ctx.active_rhi->get_capabilities(g_ctx.active_device, &caps);
 
     if (h <= 0) h = 1;
-    float aspect = (float)w / (float)h;
+    float aspect = (float) w / (float) h;
 
     mat4_t P, V, M, R, PV, MVP;
     perspective_from_caps(&caps, 60.0f * (PI / 180.0f), aspect, 0.1f, 100.0f, P);
@@ -51,7 +51,7 @@ static void app_update_triangle_mvp(int w, int h) {
     mat4_mul(PV, R, MVP);
     mat4_to_backend_order(&caps, MVP, MVP);
 
-    material_set_mat4(g_triangle_material, "uMVP", (const float*)MVP);
+    material_set_mat4(g_triangle_material, "uMVP", (const float*) MVP);
 }
 
 static void app_update_sprite_mvp(int w, int h) {
@@ -61,7 +61,7 @@ static void app_update_sprite_mvp(int w, int h) {
     g_ctx.active_rhi->get_capabilities(g_ctx.active_device, &caps);
 
     mat4_t P, MVP;
-    ortho_from_caps(&caps, 0.0f, (float)w, 0.0f, (float)h, -1.0f, 1.0f, P);
+    ortho_from_caps(&caps, 0.0f, (float) w, 0.0f, (float) h, -1.0f, 1.0f, P);
 
     mat4_identity(MVP);
     vec3_t position = {100, 200, 0.0f};
@@ -69,7 +69,7 @@ static void app_update_sprite_mvp(int w, int h) {
 
     mat4_mul(P, MVP, MVP);
 
-    material_set_mat4(g_sprite_material, "uMVP", (const float*)MVP);
+    material_set_mat4(g_sprite_material, "uMVP", (const float*) MVP);
 }
 
 static void app_render(renderer_t *R, void *user) {
@@ -97,8 +97,8 @@ static void app_init(void) {
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-        {"COLOR",    0, RHI_VTX_F32x3, 0, (uint32_t)(sizeof(float) * 3)},
-        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t)(sizeof(float) * 6)},
+        {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 3)},
+        {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 6)},
     };
 
     mesh_desc_t mesh_desc = {0};

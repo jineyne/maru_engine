@@ -3,7 +3,10 @@ set(ENGINE_ASSET_SRC
     "engine/asset/texture.c"
     "engine/asset/texture_manager.c"
     "engine/asset/mesh.c"
-    "engine/asset/sprite.c")
+    "engine/asset/sprite.c"
+    "engine/asset/importer.c"
+    "engine/asset/importers/texture_importer.c"
+    "engine/asset/importers/mesh_obj_importer.c")
 
 set(ENGINE_MATERIAL_SRC
     "engine/material/material.c")
