@@ -154,12 +154,7 @@ static void app_init(void) {
     }
 
     /* Load texture */
-    asset_texture_opts_t opts = {
-        .gen_mips = 1,
-        .flip_y = 0,
-        .force_rgba = 1
-    };
-    g_texture = tex_create_from_file("texture/karina.jpg", &opts);
+    g_texture = tex_create_from_file("texture/karina.jpg");
     if (g_texture == TEX_HANDLE_INVALID) {
         ERROR("failed to load texture");
     } else {

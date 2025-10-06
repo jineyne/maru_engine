@@ -14,15 +14,13 @@ typedef struct texture_t {
     void *internal;
 } texture_t;
 
-typedef struct asset_texture_opts_t {
+typedef struct texture_opts_t {
     int gen_mips;
-    int flip_y;
-    int force_rgba;
-} asset_texture_opts_t;
+} texture_opts_t;
 
-texture_t *asset_load_texture(const char *relpath, const asset_texture_opts_t *opts);
-void asset_free_texture(texture_t *tex);
-void *asset_texture_get_rhi_handle(texture_t *tex);
+texture_t *texture_create_from_data(int width, int height, const unsigned char *rgba_pixels, const texture_opts_t *opts);
+void texture_destroy(texture_t *tex);
+void *texture_get_rhi_handle(texture_t *tex);
 
 #ifdef __cplusplus
 }

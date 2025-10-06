@@ -24,7 +24,7 @@ enum {
 int texture_manager_init(size_t capacity);
 void texture_manager_shutdown(void);
 
-texture_handle_t tex_create_from_file(const char *relpath, const asset_texture_opts_t *opts);
+texture_handle_t tex_create_from_file(const char *relpath);
 
 void tex_destroy(texture_handle_t h);
 

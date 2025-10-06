@@ -1,5 +1,6 @@
 #include "texture_manager.h"
 
+#include "asset/importer.h"
 #include "handle/handle_pool.h"
 #include "mem/mem_diag.h"
 #include "log.h"
@@ -50,15 +51,12 @@ void texture_manager_shutdown(void) {
 }
 
 
-texture_handle_t tex_create_from_file(const char *relpath, const asset_texture_opts_t *opts) {
+texture_handle_t tex_create_from_file(const char *relpath) {
     if (!s_pool || !relpath) return TEX_HANDLE_INVALID;
 
-    asset_texture_opts_t o = {.gen_mips = 1, .flip_y = 1, .force_rgba = 1};
-    if (opts) o = *opts;
-
-    texture_t *t = asset_load_texture(relpath, &o);
+    texture_t *t = (texture_t*) asset_import(relpath, NULL);
     if (!t) {
-        MR_LOG(ERROR, "texture_manager: load failed: %s", relpath);
+        ERROR("texture_manager: import failed: %s", relpath);
         return TEX_HANDLE_INVALID;
     }
 
@@ -68,12 +66,11 @@ texture_handle_t tex_create_from_file(const char *relpath, const asset_texture_o
     init.flags = TEX_STATE_READY;
     handle_t h = handle_pool_alloc(s_pool, &init);
     if (h == HANDLE_INVALID) {
-        MR_LOG(ERROR, "texture_manager: pool full; cannot allocate handle for %s", relpath);
-        asset_free_texture(t);
+        ERROR("texture_manager: pool full; cannot allocate handle for %s", relpath);
+        texture_destroy(t);
         if (init.src_rel) {
             MARU_FREE(init.src_rel);
         }
-
         return TEX_HANDLE_INVALID;
     }
 
@@ -85,9 +82,8 @@ void tex_destroy(texture_handle_t th) {
     tex_rec_t *rec = (tex_rec_t*) handle_pool_get(s_pool, (handle_t) th);
     if (!rec) return;
 
-
     if (rec->tex) {
-        asset_free_texture(rec->tex);
+        texture_destroy(rec->tex);
         rec->tex = NULL;
     }
     if (rec->src_rel) {
