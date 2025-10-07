@@ -174,18 +174,17 @@ static void dx11_refresh_backbuffer_rt(dx11_state_t *st) {
     if (!st || !st->rtv) return;
     if (!st->back_rt) {
         st->back_rt = (rhi_render_target_t*) MARU_CALLOC(1, sizeof(rhi_render_target_t));
-    }
+        dx11_rt_t *rt = &st->back_rt->rt;
+        memset(rt, 0, sizeof(*rt));
+        rt->st = st;
+        rt->is_backbuffer = 1;
+        rt->color_count = 1;
+        rt->rtvs[0] = st->rtv;
+        rt->dsv = NULL;
 
-    dx11_rt_t *rt = &st->back_rt->rt;
-    memset(rt, 0, sizeof(*rt));
-    rt->st = st;
-    rt->is_backbuffer = 1;
-    rt->color_count = 1;
-    rt->rtvs[0] = st->rtv;
-    rt->dsv = NULL;
-
-    if (dx11_rt_create_depth(st, rt, st->w, st->h) != 0) {
-        dx11_rt_release_depth(rt);
+        if (dx11_rt_create_depth(st, rt, st->w, st->h) != 0) {
+            dx11_rt_release_depth(rt);
+        }
     }
 }
 

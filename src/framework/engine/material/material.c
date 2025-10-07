@@ -287,6 +287,9 @@ material_handle_t material_create_instance(material_handle_t base) {
     /* Allocate new handle */
     handle_t h = handle_pool_alloc(s_pool, &instance);
     if (h == HANDLE_INVALID) {
+        if (instance.params) {
+            MARU_FREE(instance.params);
+        }
         MR_LOG(ERROR, "material_create_instance: pool full");
         return MAT_HANDLE_INVALID;
     }
