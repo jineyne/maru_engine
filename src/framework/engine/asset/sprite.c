@@ -94,7 +94,7 @@ sprite_handle_t sprite_create(const sprite_desc_t *desc) {
         -hw, hh, 0.0f, 0.0f, 0.0f, 0, 0, 1, /* top-left */
     };
 
-    uint32_t indices[] = {0, 2, 1, 2, 0, 3}; /* CW winding */
+    uint32_t indices[] = {0, 1, 2, 2, 3, 0};
 
     static const rhi_vertex_attr_t attrs[] = {
         {"POSITION", 0, RHI_VTX_F32x3, 0, 0},

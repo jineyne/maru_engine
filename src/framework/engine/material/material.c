@@ -194,13 +194,13 @@ material_handle_t material_create(const material_desc_t *desc) {
     /* Rasterizer state */
     pd.raster.fill = RHI_FILL_SOLID;
     pd.raster.cull = RHI_CULL_BACK;
-    pd.raster.front_ccw = 0;
+    pd.raster.front_ccw = 1;
     pd.raster.depth_bias = 0.0f;
     pd.raster.slope_scaled_depth_bias = 0.0f;
 
     /* Depth-stencil state */
     pd.depthst.depth_test_enable = 1;
-    pd.depthst.depth_write_enable = 0;
+    pd.depthst.depth_write_enable = 1;
     pd.depthst.depth_func = RHI_CMP_LEQUAL;
 
     /* Blend state (alpha blending) */

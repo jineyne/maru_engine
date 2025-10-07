@@ -100,6 +100,9 @@ static void create_post(renderer_t *R) {
 
     rhi_pipeline_desc_t pd = {0};
     pd.shader = R->post_sh;
+    pd.raster.fill = RHI_FILL_SOLID;
+    pd.raster.cull = RHI_CULL_NONE;
+    pd.raster.front_ccw = 1;
     pd.depthst.depth_test_enable = 0;
     pd.depthst.depth_write_enable = 0;
     pd.blend.enable = false;
