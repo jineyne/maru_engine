@@ -42,15 +42,6 @@ static float g_camera_pitch = 0.0f;
 static void app_update_camera(renderer_t *R, int w, int h) {
     if (!g_ctx.active_rhi || !g_ctx.active_device) return;
 
-    /* Input: Keyboard movement (WASD) */
-    float move_speed = 0.1f;
-    if (input_key_pressed(INPUT_KEY_W)) g_camera_pos[2] -= move_speed;
-    if (input_key_pressed(INPUT_KEY_S)) g_camera_pos[2] += move_speed;
-    if (input_key_pressed(INPUT_KEY_A)) g_camera_pos[0] -= move_speed;
-    if (input_key_pressed(INPUT_KEY_D)) g_camera_pos[0] += move_speed;
-    if (input_key_pressed(INPUT_KEY_SPACE)) g_camera_pos[1] += move_speed;
-    if (input_key_pressed(INPUT_KEY_SHIFT)) g_camera_pos[1] -= move_speed;
-
     if (input_mouse_button_pressed(INPUT_MOUSE_RIGHT)) {
         float dx, dy;
         input_mouse_delta(&dx, &dy);
@@ -61,7 +52,39 @@ static void app_update_camera(renderer_t *R, int w, int h) {
         if (g_camera_pitch < -PI / 2.0f + 0.01f) g_camera_pitch = -PI / 2.0f + 0.01f;
     }
 
-    /* Projection */
+    vec3_t forward = {
+        sinf(g_camera_yaw) * cosf(g_camera_pitch),
+        sinf(g_camera_pitch),
+        cosf(g_camera_yaw) * cosf(g_camera_pitch)
+    };
+    vec3_t right = {
+        -cosf(g_camera_yaw),
+        0.0f,
+        sinf(g_camera_yaw)
+    };
+
+    float move_speed = 0.1f;
+    if (input_key_pressed(INPUT_KEY_W)) {
+        g_camera_pos[0] += forward[0] * move_speed;
+        g_camera_pos[1] += forward[1] * move_speed;
+        g_camera_pos[2] += forward[2] * move_speed;
+    }
+    if (input_key_pressed(INPUT_KEY_S)) {
+        g_camera_pos[0] -= forward[0] * move_speed;
+        g_camera_pos[1] -= forward[1] * move_speed;
+        g_camera_pos[2] -= forward[2] * move_speed;
+    }
+    if (input_key_pressed(INPUT_KEY_A)) {
+        g_camera_pos[0] -= right[0] * move_speed;
+        g_camera_pos[2] -= right[2] * move_speed;
+    }
+    if (input_key_pressed(INPUT_KEY_D)) {
+        g_camera_pos[0] += right[0] * move_speed;
+        g_camera_pos[2] += right[2] * move_speed;
+    }
+    if (input_key_pressed(INPUT_KEY_SPACE)) g_camera_pos[1] += move_speed;
+    if (input_key_pressed(INPUT_KEY_SHIFT)) g_camera_pos[1] -= move_speed;
+
     rhi_capabilities_t caps;
     g_ctx.active_rhi->get_capabilities(g_ctx.active_device, &caps);
     if (h <= 0) h = 1;
@@ -70,13 +93,7 @@ static void app_update_camera(renderer_t *R, int w, int h) {
     mat4_t P;
     perspective_from_caps(&caps, 60.0f * (PI / 180.0f), aspect, 0.1f, 100.0f, P);
 
-    /* View: Calculate look direction from yaw/pitch */
     mat4_t V;
-    vec3_t forward = {
-        sinf(g_camera_yaw) * cosf(g_camera_pitch),
-        sinf(g_camera_pitch),
-        cosf(g_camera_yaw) * cosf(g_camera_pitch)
-    };
     vec3_t target;
     glm_vec3_add(g_camera_pos, forward, target);
     vec3_t up = {0.0f, 1.0f, 0.0f};
@@ -131,10 +148,10 @@ static void app_init(void) {
     vec3 pos = {0.0f, 0.0f, 0.0f};
     transform_set_position(&g_triangle_transform, pos);
 
-    /* Load triangle mesh using asset importer */
-    mesh_handle_t *mesh_h = (mesh_handle_t*)asset_import("mesh/triangle.obj", NULL);
+    /* Load cube mesh using asset importer */
+    mesh_handle_t *mesh_h = (mesh_handle_t*)asset_import("mesh/cube.obj", NULL);
     if (!mesh_h) {
-        ERROR("failed to load triangle mesh from OBJ");
+        ERROR("failed to load cube mesh from OBJ");
         return;
     }
     g_triangle_mesh = *mesh_h;
