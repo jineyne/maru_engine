@@ -167,7 +167,7 @@ uint32_t mesh_get_index_count(mesh_handle_t h) {
 }
 
 void mesh_bind(struct rhi_cmd *cmd, mesh_handle_t h) {
-    if (h == MESH_HANDLE_INVALID) return;
+    if (!cmd || h == MESH_HANDLE_INVALID) return;
 
     uint32_t idx = h - 1;
     if (idx >= g_mesh_pool.capacity) {
@@ -187,7 +187,7 @@ void mesh_bind(struct rhi_cmd *cmd, mesh_handle_t h) {
 }
 
 void mesh_draw(struct rhi_cmd *cmd, mesh_handle_t h) {
-    if (h == MESH_HANDLE_INVALID) return;
+    if (!cmd || h == MESH_HANDLE_INVALID) return;
 
     uint32_t idx = h - 1;
     if (idx >= g_mesh_pool.capacity) {

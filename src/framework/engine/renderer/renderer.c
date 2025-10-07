@@ -191,23 +191,23 @@ void renderer_shutdown(renderer_t *R) {
 
 /* Rendering API */
 void renderer_bind_material(renderer_t *R, material_handle_t mat) {
-    if (!R || !R->current_cmd) return;
+    if (!R || !R->current_cmd || mat == MAT_HANDLE_INVALID) return;
     material_bind(R->current_cmd, mat);
 }
 
 void renderer_draw_mesh(renderer_t *R, mesh_handle_t mesh) {
-    if (!R || !R->current_cmd) return;
+    if (!R || !R->current_cmd || mesh == MESH_HANDLE_INVALID) return;
     mesh_bind(R->current_cmd, mesh);
     mesh_draw(R->current_cmd, mesh);
 }
 
 void renderer_draw_sprite(renderer_t *R, sprite_handle_t sprite, float x, float y) {
-    if (!R || !R->current_cmd) return;
+    if (!R || !R->current_cmd || sprite == SPRITE_HANDLE_INVALID) return;
     sprite_draw(R->current_cmd, sprite, x, y);
 }
 
 void renderer_set_camera(renderer_t *R, const float *view, const float *projection) {
-    if (!R) return;
+    if (!R || !view || !projection) return;
 
     memcpy(R->view_matrix, view, sizeof(mat4));
     memcpy(R->projection_matrix, projection, sizeof(mat4));
@@ -215,7 +215,7 @@ void renderer_set_camera(renderer_t *R, const float *view, const float *projecti
 }
 
 void renderer_draw_object(renderer_t *R, render_object_handle_t obj) {
-    if (!R || !R->current_cmd) return;
+    if (!R || !R->current_cmd || obj == RENDER_OBJECT_HANDLE_INVALID) return;
 
     const render_object_t *ro = render_object_get_const(obj);
     if (!ro) return;

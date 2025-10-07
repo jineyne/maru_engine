@@ -65,6 +65,7 @@ void render_object_destroy(render_object_handle_t handle) {
 }
 
 void render_object_set_mesh(render_object_handle_t handle, mesh_handle_t mesh) {
+    if (handle == RENDER_OBJECT_HANDLE_INVALID) return;
     render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
     if (obj) {
         obj->mesh = mesh;
@@ -72,6 +73,7 @@ void render_object_set_mesh(render_object_handle_t handle, mesh_handle_t mesh) {
 }
 
 void render_object_set_material(render_object_handle_t handle, material_handle_t base_material) {
+    if (handle == RENDER_OBJECT_HANDLE_INVALID || base_material == MAT_HANDLE_INVALID) return;
     render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
     if (!obj) return;
 
@@ -88,6 +90,7 @@ void render_object_set_material(render_object_handle_t handle, material_handle_t
 }
 
 void render_object_set_transform(render_object_handle_t handle, transform_t *transform) {
+    if (handle == RENDER_OBJECT_HANDLE_INVALID) return;
     render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
     if (obj) {
         obj->transform = transform;
@@ -95,6 +98,7 @@ void render_object_set_transform(render_object_handle_t handle, transform_t *tra
 }
 
 void render_object_set_visible(render_object_handle_t handle, uint8_t visible) {
+    if (handle == RENDER_OBJECT_HANDLE_INVALID) return;
     render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
     if (obj) {
         obj->visible = visible ? 1 : 0;
@@ -102,6 +106,7 @@ void render_object_set_visible(render_object_handle_t handle, uint8_t visible) {
 }
 
 void render_object_set_layer(render_object_handle_t handle, uint32_t layer) {
+    if (handle == RENDER_OBJECT_HANDLE_INVALID) return;
     render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
     if (obj) {
         obj->layer = layer;
