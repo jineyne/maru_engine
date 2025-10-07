@@ -58,6 +58,9 @@ typedef struct {
     uint8_t *cb_data[4]; /* CPU-side data */
     size_t cb_sizes[4];
     uint8_t cb_dirty[4];
+
+    /* Instance management */
+    uint8_t is_instance : 1;  /* If true, don't destroy shader/pipeline */
 } material_t;
 
 static handle_pool_t *s_pool = NULL;
@@ -224,12 +227,59 @@ material_handle_t material_create(const material_desc_t *desc) {
     init.params = NULL;
     init.param_count = 0;
     init.param_capacity = 0;
+    init.is_instance = 0;  /* Base material */
 
     handle_t h = handle_pool_alloc(s_pool, &init);
     if (h == HANDLE_INVALID) {
         rhi->destroy_pipeline(g_ctx.active_device, pl);
         rhi->destroy_shader(g_ctx.active_device, sh);
         MR_LOG(ERROR, "material: pool full");
+        return MAT_HANDLE_INVALID;
+    }
+
+    return (material_handle_t) h;
+}
+
+material_handle_t material_create_instance(material_handle_t base) {
+    if (!s_pool || base == MAT_HANDLE_INVALID) {
+        return MAT_HANDLE_INVALID;
+    }
+
+    material_t *base_mat = (material_t*) handle_pool_get(s_pool, (handle_t) base);
+    if (!base_mat) {
+        MR_LOG(ERROR, "material_create_instance: invalid base material");
+        return MAT_HANDLE_INVALID;
+    }
+
+    /* Create instance - shares shader/pipeline, clones params */
+    material_t instance;
+    memset(&instance, 0, sizeof(instance));
+
+    /* Shared resources (pointer copy only) */
+    instance.sh = base_mat->sh;
+    instance.pl = base_mat->pl;
+
+    /* Per-instance data (deep copy of params array) */
+    instance.param_count = base_mat->param_count;
+    instance.param_capacity = base_mat->param_capacity;
+    instance.is_instance = 1;  /* Mark as instance */
+
+    if (base_mat->param_count > 0 && base_mat->params) {
+        size_t params_size = base_mat->param_capacity * sizeof(material_param_t);
+        instance.params = (material_param_t*) MARU_MALLOC(params_size);
+        if (!instance.params) {
+            MR_LOG(ERROR, "material_create_instance: failed to allocate params");
+            return MAT_HANDLE_INVALID;
+        }
+        memcpy(instance.params, base_mat->params, params_size);
+    } else {
+        instance.params = NULL;
+    }
+
+    /* Allocate new handle */
+    handle_t h = handle_pool_alloc(s_pool, &instance);
+    if (h == HANDLE_INVALID) {
+        MR_LOG(ERROR, "material_create_instance: pool full");
         return MAT_HANDLE_INVALID;
     }
 
@@ -244,6 +294,7 @@ void material_destroy(material_handle_t mh) {
 
     const rhi_dispatch_t *rhi = g_ctx.active_rhi;
 
+    /* Free per-instance data */
     if (m->params) {
         MARU_FREE(m->params);
         m->params = NULL;
@@ -260,13 +311,16 @@ void material_destroy(material_handle_t mh) {
         }
     }
 
-    if (m->pl) {
-        rhi->destroy_pipeline(g_ctx.active_device, m->pl);
-        m->pl = NULL;
-    }
-    if (m->sh) {
-        rhi->destroy_shader(g_ctx.active_device, m->sh);
-        m->sh = NULL;
+    /* Only destroy shared resources if this is NOT an instance */
+    if (!m->is_instance) {
+        if (m->pl) {
+            rhi->destroy_pipeline(g_ctx.active_device, m->pl);
+            m->pl = NULL;
+        }
+        if (m->sh) {
+            rhi->destroy_shader(g_ctx.active_device, m->sh);
+            m->sh = NULL;
+        }
     }
 
     handle_pool_free(s_pool, (handle_t) mh);

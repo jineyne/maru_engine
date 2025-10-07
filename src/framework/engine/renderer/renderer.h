@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "math/math.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,6 +51,11 @@ struct renderer {
     /* Scene callback */
     render_scene_fn scene_cb;
     void *scene_user;
+
+    /* Camera matrices */
+    mat4_t view_matrix;
+    mat4_t projection_matrix;
+    uint8_t camera_set : 1;
 };
 
 int renderer_init(renderer_t *R, const struct rhi_dispatch *rhi, struct rhi_device *dev, int w, int h);
@@ -56,6 +63,9 @@ void renderer_resize(renderer_t *R, int w, int h);
 void renderer_set_scene(renderer_t *R, render_scene_fn fn, void *user);
 void renderer_render(renderer_t *R); /* no present */
 void renderer_shutdown(renderer_t *R);
+
+/* Camera */
+void renderer_set_camera(renderer_t *R, const float *view, const float *projection);
 
 /* High-level rendering API */
 void renderer_draw_object(renderer_t *R, render_object_handle_t obj);

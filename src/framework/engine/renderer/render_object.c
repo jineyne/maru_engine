@@ -1,5 +1,6 @@
 #include "render_object.h"
 #include "handle/handle_pool.h"
+#include "material/material.h"
 #include "log.h"
 #include <string.h>
 
@@ -53,6 +54,13 @@ void render_object_destroy(render_object_handle_t handle) {
     if (!g_render_object_pool) return;
     if (handle == RENDER_OBJECT_HANDLE_INVALID) return;
 
+    /* Cleanup material instance */
+    render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
+    if (obj && obj->material != MAT_HANDLE_INVALID) {
+        material_destroy(obj->material);
+        obj->material = MAT_HANDLE_INVALID;
+    }
+
     handle_pool_free(g_render_object_pool, handle);
 }
 
@@ -63,10 +71,19 @@ void render_object_set_mesh(render_object_handle_t handle, mesh_handle_t mesh) {
     }
 }
 
-void render_object_set_material(render_object_handle_t handle, material_handle_t material) {
+void render_object_set_material(render_object_handle_t handle, material_handle_t base_material) {
     render_object_t *obj = handle_pool_get(g_render_object_pool, handle);
-    if (obj) {
-        obj->material = material;
+    if (!obj) return;
+
+    /* Destroy existing instance if any */
+    if (obj->material != MAT_HANDLE_INVALID) {
+        material_destroy(obj->material);
+    }
+
+    /* Create new instance from base material */
+    obj->material = material_create_instance(base_material);
+    if (obj->material == MAT_HANDLE_INVALID) {
+        ERROR("render_object_set_material: failed to create material instance");
     }
 }
 

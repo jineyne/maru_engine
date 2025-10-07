@@ -10,6 +10,8 @@
 #include "asset/asset.h"
 #include "mem/mem_diag.h"
 #include "render_object.h"
+#include "math/math.h"
+#include "math/proj.h"
 
 static void destroy_offscreen(renderer_t *R) {
     if (!R || !R->rhi) return;
@@ -201,6 +203,14 @@ void renderer_draw_sprite(renderer_t *R, sprite_handle_t sprite, float x, float 
     sprite_draw(R->current_cmd, sprite, x, y);
 }
 
+void renderer_set_camera(renderer_t *R, const float *view, const float *projection) {
+    if (!R) return;
+
+    memcpy(R->view_matrix, view, sizeof(mat4));
+    memcpy(R->projection_matrix, projection, sizeof(mat4));
+    R->camera_set = 1;
+}
+
 void renderer_draw_object(renderer_t *R, render_object_handle_t obj) {
     if (!R || !R->current_cmd) return;
 
@@ -209,6 +219,23 @@ void renderer_draw_object(renderer_t *R, render_object_handle_t obj) {
 
     /* Skip invisible objects */
     if (!ro->visible) return;
+
+    /* Auto-calculate MVP if camera is set and transform exists */
+    if (R->camera_set && ro->transform) {
+        const mat4 *M = transform_get_world_matrix(ro->transform);
+
+        mat4 PV, MVP;
+        mat4_mul(R->projection_matrix, R->view_matrix, PV);
+        mat4_mul(PV, *M, MVP);
+
+        /* Backend order conversion */
+        rhi_capabilities_t caps;
+        R->rhi->get_capabilities(R->dev, &caps);
+        mat4_to_backend_order(&caps, MVP, MVP);
+
+        /* Set MVP to material instance */
+        material_set_mat4(ro->material, "uMVP", (const float*)MVP);
+    }
 
     /* Bind material and draw mesh */
     renderer_bind_material(R, ro->material);

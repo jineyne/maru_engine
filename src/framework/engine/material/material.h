@@ -36,6 +36,7 @@ typedef struct material_desc {
 } material_desc_t;
 
 material_handle_t material_create(const material_desc_t *desc);
+material_handle_t material_create_instance(material_handle_t base);
 void material_destroy(material_handle_t h);
 
 void material_set_float(material_handle_t h, const char *name, float value);
