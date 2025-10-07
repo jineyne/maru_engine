@@ -26,6 +26,9 @@ static material_handle_t g_triangle_material = MAT_HANDLE_INVALID;
 static material_handle_t g_sprite_material = MAT_HANDLE_INVALID;
 static texture_handle_t g_texture = TEX_HANDLE_INVALID;
 
+/* Transform */
+static transform_t g_triangle_transform;
+
 static void app_update_triangle_mvp(int w, int h) {
     if (!g_ctx.active_rhi || !g_ctx.active_device || g_triangle_material == MAT_HANDLE_INVALID) return;
 
@@ -38,18 +41,25 @@ static void app_update_triangle_mvp(int w, int h) {
     if (h <= 0) h = 1;
     float aspect = (float) w / (float) h;
 
-    mat4_t P, V, M, R, PV, MVP;
+    /* Projection */
+    mat4_t P;
     perspective_from_caps(&caps, 60.0f * (PI / 180.0f), aspect, 0.1f, 100.0f, P);
 
+    /* View */
+    mat4_t V;
     vec3_t eye = {0.f, 0.f, 2.5f};
     vec3_t at = {0.f, 0.f, 0.f};
     vec3_t up = {0.f, 1.f, 0.f};
     look_at(eye, at, up, V);
 
-    mat4_identity(M);
-    glm_rotate_y(M, s_angle, R);
+    /* Model - Use transform system */
+    transform_set_euler(&g_triangle_transform, 0.0f, s_angle, 0.0f);
+    const mat4 *M = transform_get_local_matrix(&g_triangle_transform);
+
+    /* MVP composition */
+    mat4_t PV, MVP;
     mat4_mul(P, V, PV);
-    mat4_mul(PV, R, MVP);
+    mat4_mul(PV, *M, MVP);
     mat4_to_backend_order(&caps, MVP, MVP);
 
     material_set_mat4(g_triangle_material, "uMVP", (const float*) MVP);
@@ -86,6 +96,11 @@ static void app_render(renderer_t *R, void *user) {
 }
 
 static void app_init(void) {
+    /* Initialize transform */
+    transform_init(&g_triangle_transform);
+    vec3 pos = {0.0f, 0.0f, 0.0f};
+    transform_set_position(&g_triangle_transform, pos);
+
     /* Load triangle mesh using asset importer */
     mesh_handle_t *mesh_h = (mesh_handle_t*)asset_import("mesh/triangle.obj", NULL);
     if (!mesh_h) {
@@ -94,40 +109,6 @@ static void app_init(void) {
     }
     g_triangle_mesh = *mesh_h;
     MARU_FREE(mesh_h);
-
-    /*
-     * Alternative: Create triangle mesh manually (old way)
-     *
-     * float vtx[] = {
-     *     //          position             color     uv
-     *     / * top   * / 0.0f, 0.5f, 0.0f, 1, 0, 0, 0.5f, 0.0f,
-     *     / * right * / 0.5f, -0.5f, 0.0f, 0, 0, 1, 1.0f, 1.0f,
-     *     / * left  * / -0.5f, -0.5f, 0.0f, 0, 1, 0, 0.0f, 1.0f,
-     * };
-     *
-     * uint32_t idx[] = {0, 1, 2};
-     *
-     * static const rhi_vertex_attr_t attrs[] = {
-     *     {"POSITION", 0, RHI_VTX_F32x3, 0, 0},
-     *     {"COLOR", 0, RHI_VTX_F32x3, 0, (uint32_t) (sizeof(float) * 3)},
-     *     {"TEXCOORD", 0, RHI_VTX_F32x2, 0, (uint32_t) (sizeof(float) * 6)},
-     * };
-     *
-     * mesh_desc_t mesh_desc = {0};
-     * mesh_desc.vertices = vtx;
-     * mesh_desc.vertex_size = sizeof(float) * 8;
-     * mesh_desc.vertex_count = 3;
-     * mesh_desc.indices = idx;
-     * mesh_desc.index_count = 3;
-     * mesh_desc.attrs = attrs;
-     * mesh_desc.attr_count = 3;
-     *
-     * g_triangle_mesh = mesh_create(&mesh_desc);
-     * if (g_triangle_mesh == MESH_HANDLE_INVALID) {
-     *     ERROR("failed to create triangle mesh");
-     *     return;
-     * }
-     */
 
     /* Create triangle material (3D) */
     material_desc_t triangle_mat_desc = {

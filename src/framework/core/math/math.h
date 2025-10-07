@@ -24,4 +24,6 @@ static inline void vec3_copy(vec3_t s, vec3_t d) { glm_vec3_copy(s, d); }
 }
 #endif
 
+#include "transform.h"
+
 #endif /* MARU_MATH_H */

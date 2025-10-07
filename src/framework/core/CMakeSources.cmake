@@ -7,7 +7,8 @@ set(CORE_HANDLE_SRCS
 
 set(CORE_MATH_SRCS
     "core/math/math.c"
-    "core/math/proj.c")
+    "core/math/proj.c"
+    "core/math/transform.c")
 
 set(CORE_MEM_SRCS
     "core/mem/mem_diag.c"
