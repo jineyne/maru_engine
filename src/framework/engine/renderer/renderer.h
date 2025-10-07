@@ -20,6 +20,7 @@ struct rhi_cmd;
 typedef uint32_t material_handle_t;
 typedef uint32_t mesh_handle_t;
 typedef uint32_t sprite_handle_t;
+typedef uint32_t render_object_handle_t;
 
 typedef struct renderer renderer_t;
 
@@ -56,10 +57,13 @@ void renderer_set_scene(renderer_t *R, render_scene_fn fn, void *user);
 void renderer_render(renderer_t *R); /* no present */
 void renderer_shutdown(renderer_t *R);
 
-/* Rendering API - hides RHI from user */
+/* High-level rendering API */
+void renderer_draw_object(renderer_t *R, render_object_handle_t obj);
+void renderer_draw_sprite(renderer_t *R, sprite_handle_t sprite, float x, float y);
+
+/* Low-level API (internal, prefer render_object for 3D) */
 void renderer_bind_material(renderer_t *R, material_handle_t mat);
 void renderer_draw_mesh(renderer_t *R, mesh_handle_t mesh);
-void renderer_draw_sprite(renderer_t *R, sprite_handle_t sprite, float x, float y);
 
 #ifdef __cplusplus
 }

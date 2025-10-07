@@ -9,6 +9,7 @@
 #include "asset/sprite.h"
 #include "asset/asset.h"
 #include "mem/mem_diag.h"
+#include "render_object.h"
 
 static void destroy_offscreen(renderer_t *R) {
     if (!R || !R->rhi) return;
@@ -198,4 +199,18 @@ void renderer_draw_mesh(renderer_t *R, mesh_handle_t mesh) {
 void renderer_draw_sprite(renderer_t *R, sprite_handle_t sprite, float x, float y) {
     if (!R || !R->current_cmd) return;
     sprite_draw(R->current_cmd, sprite, x, y);
+}
+
+void renderer_draw_object(renderer_t *R, render_object_handle_t obj) {
+    if (!R || !R->current_cmd) return;
+
+    const render_object_t *ro = render_object_get_const(obj);
+    if (!ro) return;
+
+    /* Skip invisible objects */
+    if (!ro->visible) return;
+
+    /* Bind material and draw mesh */
+    renderer_bind_material(R, ro->material);
+    renderer_draw_mesh(R, ro->mesh);
 }

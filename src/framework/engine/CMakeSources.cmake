@@ -12,7 +12,8 @@ set(ENGINE_MATERIAL_SRC
     "engine/material/material.c")
 
 set(ENGINE_RENDERER_SRC
-    "engine/renderer/renderer.c")
+    "engine/renderer/renderer.c"
+    "engine/renderer/render_object.c")
 
 set(ENGINE_RHI_SRC
     "engine/rhi/rhi.c")

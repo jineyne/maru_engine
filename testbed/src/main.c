@@ -1,6 +1,7 @@
 #include "engine.h"
 #include "engine_context.h"
 #include "renderer/renderer.h"
+#include "renderer/render_object.h"
 #include "material/material.h"
 #include "asset/mesh.h"
 #include "asset/sprite.h"
@@ -28,6 +29,9 @@ static texture_handle_t g_texture = TEX_HANDLE_INVALID;
 
 /* Transform */
 static transform_t g_triangle_transform;
+
+/* Render objects */
+static render_object_handle_t g_triangle_obj = RENDER_OBJECT_HANDLE_INVALID;
 
 static void app_update_triangle_mvp(int w, int h) {
     if (!g_ctx.active_rhi || !g_ctx.active_device || g_triangle_material == MAT_HANDLE_INVALID) return;
@@ -90,12 +94,16 @@ static void app_render(renderer_t *R, void *user) {
         renderer_draw_sprite(R, g_sprite, 0.0f, 0.0f);
     }
 
-    /* Draw 3D triangle */
-    renderer_bind_material(R, g_triangle_material);
-    renderer_draw_mesh(R, g_triangle_mesh);
+    /* Draw 3D triangle using render object */
+    if (g_triangle_obj != RENDER_OBJECT_HANDLE_INVALID) {
+        renderer_draw_object(R, g_triangle_obj);
+    }
 }
 
 static void app_init(void) {
+    /* Initialize render object system */
+    render_object_system_init(128);
+
     /* Initialize transform */
     transform_init(&g_triangle_transform);
     vec3 pos = {0.0f, 0.0f, 0.0f};
@@ -154,6 +162,15 @@ static void app_init(void) {
         }
     }
 
+    /* Create render object for triangle */
+    g_triangle_obj = render_object_create();
+    if (g_triangle_obj != RENDER_OBJECT_HANDLE_INVALID) {
+        render_object_set_mesh(g_triangle_obj, g_triangle_mesh);
+        render_object_set_material(g_triangle_obj, g_triangle_material);
+        render_object_set_transform(g_triangle_obj, &g_triangle_transform);
+        render_object_set_visible(g_triangle_obj, 1);
+    }
+
     int cw = 0, ch = 0;
     platform_window_get_size(g_ctx.window, &cw, &ch);
     app_update_triangle_mvp(cw, ch);
@@ -168,6 +185,12 @@ static void app_update(void) {
 }
 
 static void app_shutdown(void) {
+    /* Cleanup render objects */
+    if (g_triangle_obj != RENDER_OBJECT_HANDLE_INVALID) {
+        render_object_destroy(g_triangle_obj);
+        g_triangle_obj = RENDER_OBJECT_HANDLE_INVALID;
+    }
+
     if (g_sprite != SPRITE_HANDLE_INVALID) {
         sprite_destroy(g_sprite);
         g_sprite = SPRITE_HANDLE_INVALID;
@@ -192,6 +215,9 @@ static void app_shutdown(void) {
         tex_destroy(g_texture);
         g_texture = TEX_HANDLE_INVALID;
     }
+
+    /* Shutdown render object system */
+    render_object_system_shutdown();
 }
 
 int main(void) {
