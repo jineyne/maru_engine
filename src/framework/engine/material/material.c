@@ -272,6 +272,14 @@ material_handle_t material_create_instance(material_handle_t base) {
             return MAT_HANDLE_INVALID;
         }
         memcpy(instance.params, base_mat->params, params_size);
+
+        /* Mark all constant buffer slots as dirty for first update */
+        for (uint32_t i = 0; i < base_mat->param_count; ++i) {
+            material_param_t *p = &instance.params[i];
+            if (p->type != MATERIAL_PARAM_TEXTURE) {
+                instance.cb_dirty[p->slot] = 1;
+            }
+        }
     } else {
         instance.params = NULL;
     }

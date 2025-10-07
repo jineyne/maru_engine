@@ -15,6 +15,7 @@
 #include "asset/sprite.h"
 #include "material/material.h"
 #include "platform/window.h"
+#include "platform/input.h"
 
 /* External importer vtables */
 extern const asset_importer_vtable_t g_texture_importer;
@@ -185,6 +186,7 @@ bool maru_engine_tick(void) {
 
     if (platform_should_close(g_ctx.window)) return false;
     platform_poll_events();
+    input_update(g_ctx.window);
 
     int cur_w = 0, cur_h = 0;
     platform_window_get_size(g_ctx.window, &cur_w, &cur_h);

@@ -11,6 +11,7 @@
 #include "math/math.h"
 #include "math/proj.h"
 #include "platform/window.h"
+#include "platform/input.h"
 #include "rhi/rhi.h"  /* For rhi_vertex_attr_t - TODO: hide this */
 #include "mem/mem_diag.h"
 
@@ -33,40 +34,61 @@ static transform_t g_triangle_transform;
 /* Render objects */
 static render_object_handle_t g_triangle_obj = RENDER_OBJECT_HANDLE_INVALID;
 
-static void app_update_triangle_mvp(int w, int h) {
-    if (!g_ctx.active_rhi || !g_ctx.active_device || g_triangle_material == MAT_HANDLE_INVALID) return;
+/* FPS Camera */
+static vec3 g_camera_pos = {0.0f, 1.0f, 5.0f};
+static float g_camera_yaw = PI;
+static float g_camera_pitch = 0.0f;
 
-    static float s_angle = 0.0f;
-    s_angle += 0.8f * (PI / 180.0f);
+static void app_update_camera(renderer_t *R, int w, int h) {
+    if (!g_ctx.active_rhi || !g_ctx.active_device) return;
 
+    /* Input: Keyboard movement (WASD) */
+    float move_speed = 0.1f;
+    if (input_key_pressed(INPUT_KEY_W)) g_camera_pos[2] -= move_speed;
+    if (input_key_pressed(INPUT_KEY_S)) g_camera_pos[2] += move_speed;
+    if (input_key_pressed(INPUT_KEY_A)) g_camera_pos[0] -= move_speed;
+    if (input_key_pressed(INPUT_KEY_D)) g_camera_pos[0] += move_speed;
+    if (input_key_pressed(INPUT_KEY_SPACE)) g_camera_pos[1] += move_speed;
+    if (input_key_pressed(INPUT_KEY_SHIFT)) g_camera_pos[1] -= move_speed;
+
+    if (input_mouse_button_pressed(INPUT_MOUSE_RIGHT)) {
+        float dx, dy;
+        input_mouse_delta(&dx, &dy);
+        g_camera_yaw -= dx * 0.002f;
+        g_camera_pitch -= dy * 0.002f;
+
+        if (g_camera_pitch > PI / 2.0f - 0.01f) g_camera_pitch = PI / 2.0f - 0.01f;
+        if (g_camera_pitch < -PI / 2.0f + 0.01f) g_camera_pitch = -PI / 2.0f + 0.01f;
+    }
+
+    /* Projection */
     rhi_capabilities_t caps;
     g_ctx.active_rhi->get_capabilities(g_ctx.active_device, &caps);
-
     if (h <= 0) h = 1;
     float aspect = (float) w / (float) h;
 
-    /* Projection */
     mat4_t P;
     perspective_from_caps(&caps, 60.0f * (PI / 180.0f), aspect, 0.1f, 100.0f, P);
 
-    /* View */
+    /* View: Calculate look direction from yaw/pitch */
     mat4_t V;
-    vec3_t eye = {0.f, 0.f, 2.5f};
-    vec3_t at = {0.f, 0.f, 0.f};
-    vec3_t up = {0.f, 1.f, 0.f};
-    look_at(eye, at, up, V);
+    vec3_t forward = {
+        sinf(g_camera_yaw) * cosf(g_camera_pitch),
+        sinf(g_camera_pitch),
+        cosf(g_camera_yaw) * cosf(g_camera_pitch)
+    };
+    vec3_t target;
+    glm_vec3_add(g_camera_pos, forward, target);
+    vec3_t up = {0.0f, 1.0f, 0.0f};
+    look_at(g_camera_pos, target, up, V);
 
-    /* Model - Use transform system */
+    /* Optional: Auto-rotate triangle for demo */
+    static float s_angle = 0.0f;
+    s_angle += 0.5f * (PI / 180.0f);
     transform_set_euler(&g_triangle_transform, 0.0f, s_angle, 0.0f);
-    const mat4 *M = transform_get_local_matrix(&g_triangle_transform);
 
-    /* MVP composition */
-    mat4_t PV, MVP;
-    mat4_mul(P, V, PV);
-    mat4_mul(PV, *M, MVP);
-    mat4_to_backend_order(&caps, MVP, MVP);
-
-    material_set_mat4(g_triangle_material, "uMVP", (const float*) MVP);
+    /* Set camera to renderer (MVP will be auto-calculated) */
+    renderer_set_camera(R, (const float*)V, (const float*)P);
 }
 
 static void app_update_sprite_mvp(int w, int h) {
@@ -171,16 +193,19 @@ static void app_init(void) {
         render_object_set_visible(g_triangle_obj, 1);
     }
 
+    /* Initial camera setup */
+    extern renderer_t g_renderer;
     int cw = 0, ch = 0;
     platform_window_get_size(g_ctx.window, &cw, &ch);
-    app_update_triangle_mvp(cw, ch);
+    app_update_camera(&g_renderer, cw, ch);
     app_update_sprite_mvp(cw, ch);
 }
 
 static void app_update(void) {
+    extern renderer_t g_renderer;
     int cur_w = 0, cur_h = 0;
     platform_window_get_size(g_ctx.window, &cur_w, &cur_h);
-    app_update_triangle_mvp(cur_w, cur_h);
+    app_update_camera(&g_renderer, cur_w, cur_h);
     app_update_sprite_mvp(cur_w, cur_h);
 }
 

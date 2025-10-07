@@ -19,7 +19,8 @@ set(CORE_MISC_SRCS
 
 set(CORE_PLATFORM_SRCS
     "core/platform/path.c"
-    "core/platform/window_desktop.c")
+    "core/platform/window_desktop.c"
+    "core/platform/input_desktop.c")
 
 set(CORE_PLUGIN_SRCS
     "core/plugin/plugin.c")
